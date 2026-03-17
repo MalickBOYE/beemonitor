@@ -1,7 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'https://ogciwrvnyrbokcrxdwid.supabase.co'
-// Remplacez par votre vraie clé Anon (celle qui commence par eyJ...)
-const supabaseKey = 'sb_publishable_i-v1p4JtJAAmHSxuPG4G6g_jTzFN4gJ' 
+// Ces lignes disent à l'application d'aller lire le fichier .env
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+// On vérifie que les clés sont bien chargées
+if (!supabaseUrl || !supabaseKey) {
+  console.error("Attention : Les clés Supabase ne sont pas définies dans le fichier .env")
+}
 
 export const supabase = createClient(supabaseUrl, supabaseKey)

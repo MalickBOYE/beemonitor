@@ -84,6 +84,19 @@ export default function Login() {
               />
             </div>
 
+            {/* LIEN MOT DE PASSE OUBLIÉ */}
+            {!isSignUp && (
+              <div className="flex justify-end px-2">
+                <button
+                  type="button"
+                  onClick={() => navigate('/forgot-password')}
+                  className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-amber-500 transition-colors"
+                >
+                  Mot de passe oublié ?
+                </button>
+              </div>
+            )}
+
             <button
               disabled={loading}
               className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-4 rounded-2xl transition-all transform active:scale-95 shadow-xl shadow-amber-500/10 flex items-center justify-center gap-2"
@@ -92,7 +105,7 @@ export default function Login() {
             </button>
           </form>
 
-          <div className="mt-8 text-center">
+          <div className="mt-8 text-center border-t border-white/5 pt-8">
             <button
               onClick={() => setIsSignUp(!isSignUp)}
               className="text-slate-400 hover:text-amber-500 text-sm font-medium transition-colors"
