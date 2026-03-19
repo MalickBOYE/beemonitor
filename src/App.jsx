@@ -1,8 +1,8 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from './lib/supabaseClient';
 
-// Import des Pages
+// Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -12,78 +12,55 @@ import LandingPage from './pages/LandingPage';
 import ForgotPassword from './pages/ForgotPassword';
 import UpdatePassword from './pages/UpdatePassword';
 
-/**
- * AppContent : Gère la navigation et l'écouteur de session.
- * Séparé de App pour que useNavigate() soit bien à l'intérieur du contexte <Router>.
- */
-function AppContent({ session, setSession }) {
+export default function App() {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Écouteur global pour les changements d'état (Login, Logout, Session expirée)
+    // 1. Vérification initiale de la session
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      setLoading(false);
+    });
+
+    // 2. Écouteur de changement d'état
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
       setSession(currentSession);
-      
       if (event === 'SIGNED_OUT') {
         navigate('/login');
       }
     });
 
-    return () => {
-      if (subscription) subscription.unsubscribe();
-    };
-  }, [navigate, setSession]);
+    return () => subscription?.unsubscribe();
+  }, [navigate]);
+
+  // Écran de chargement (rendu à l'intérieur du flux normal)
+  if (loading) {
+    return (
+      <div className="bg-[#020617] h-screen flex flex-col items-center justify-center">
+        <div className="animate-spin h-10 w-10 border-4 border-amber-500 border-t-transparent rounded-full mb-4" />
+        <span className="text-amber-500 font-black uppercase text-[10px] tracking-widest">Initialisation...</span>
+      </div>
+    );
+  }
 
   return (
     <Routes>
       {/* ROUTES PUBLIQUES */}
       <Route path="/" element={!session ? <LandingPage /> : <Navigate to="/dashboard" replace />} />
       <Route path="/login" element={!session ? <Login /> : <Navigate to="/dashboard" replace />} />
-      <Route path="/register" element={<Register />} />
+      <Route path="/register" element={!session ? <Register /> : <Navigate to="/dashboard" replace />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<UpdatePassword />} />
       
-      {/* ROUTES PROTÉGÉES (Nécessitent une session) */}
+      {/* ROUTES PROTÉGÉES */}
       <Route path="/dashboard" element={session ? <Dashboard /> : <Navigate to="/login" replace />} />
       <Route path="/admin-dashboard" element={session ? <AdminDashboard /> : <Navigate to="/login" replace />} />
       <Route path="/hive/:id" element={session ? <HiveDetail /> : <Navigate to="/login" replace />} />
       
-      {/* Redirection automatique pour les URL inconnues */}
+      {/* REDIRECTION PAR DÉFAUT */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-  );
-}
-
-/**
- * Composant Racine
- */
-export default function App() {
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  // Les Hooks (useState, useEffect) doivent TOUJOURS être appelés au début du composant
-  useEffect(() => {
-    const initialize = async () => {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      setSession(currentSession);
-      setLoading(false);
-    };
-    initialize();
-  }, []);
-
-  // Le rendu conditionnel de l'écran de chargement se fait APRES les Hooks
-  if (loading) {
-    return (
-      <div className="bg-[#020617] h-screen flex flex-col items-center justify-center gap-4">
-        <div className="animate-spin h-10 w-10 border-4 border-amber-500 border-t-transparent rounded-full" />
-        <span className="text-amber-500 font-black uppercase text-[10px] tracking-[0.3em]">Initialisation...</span>
-      </div>
-    );
-  }
-
-  return (
-    <Router>
-      <AppContent session={session} setSession={setSession} />
-    </Router>
   );
 }
