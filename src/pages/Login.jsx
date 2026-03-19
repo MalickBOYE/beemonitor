@@ -32,7 +32,33 @@ export default function Login() {
       setLoading(false);
     }
   };
+const handleLogin = async (e) => {
+  e.preventDefault();
+  
+  // 1. Connexion classique avec Supabase
+  const { data: { user }, error } = await supabase.auth.signInWithPassword({
+    email: email, // Si l'utilisateur tape "Admin", il faudra gérer la correspondance avec ton mail admin
+    password: password,
+  });
 
+  if (error) return alert(error.message);
+
+  // 2. Récupérer le profil pour vérifier les droits
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_admin, is_approved')
+    .eq('id', user.id)
+    .single();
+
+  if (profile.is_admin) {
+    navigate('/admin-dashboard'); // Redirige vers la page admin
+  } else if (!profile.is_approved) {
+    await supabase.auth.signOut();
+    alert("Votre compte est en attente de validation par l'administrateur.");
+  } else {
+    navigate('/dashboard'); // Utilisateur standard approuvé
+  }
+};
   return (
     <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 relative overflow-hidden">
       {/* Effets de lumière en arrière-plan */}
