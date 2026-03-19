@@ -1,8 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from './lib/supabaseClient';
 
-// Import des Pages
+// Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -12,71 +12,63 @@ import LandingPage from './pages/LandingPage';
 import ForgotPassword from './pages/ForgotPassword';
 import UpdatePassword from './pages/UpdatePassword';
 
-/**
- * AppContent gère la navigation et les écouteurs de session.
- * Il doit être ENFANT de <Router> pour que useNavigate fonctionne.
- */
+// Ce composant interne gère la navigation sécurisée
 function AppContent({ session, setSession }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Écouteur unique pour les changements d'état (Login, Logout, Suppression)
+    // Écouteur de session unique : si on se déconnecte, on va au login
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
       setSession(currentSession);
-      
-      // Si l'utilisateur est déconnecté ou supprimé en base, on le renvoie au Login
       if (event === 'SIGNED_OUT') {
         navigate('/login');
       }
     });
 
-    return () => {
-      if (subscription) subscription.unsubscribe();
-    };
+    return () => subscription?.unsubscribe();
   }, [navigate, setSession]);
 
   return (
     <Routes>
-      {/* --- ROUTES PUBLIQUES --- */}
+      {/* --- ACCÈS PUBLIC --- */}
       <Route path="/" element={!session ? <LandingPage /> : <Navigate to="/dashboard" replace />} />
       <Route path="/login" element={!session ? <Login /> : <Navigate to="/dashboard" replace />} />
-      <Route path="/register" element={!session ? <Register /> : <Navigate to="/dashboard" replace />} />
+      <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<UpdatePassword />} />
       
-      {/* --- ROUTES PROTÉGÉES (Nécessitent une session) --- */}
+      {/* --- ACCÈS PROTÉGÉ --- */}
       <Route path="/dashboard" element={session ? <Dashboard /> : <Navigate to="/login" replace />} />
       <Route path="/admin-dashboard" element={session ? <AdminDashboard /> : <Navigate to="/login" replace />} />
       <Route path="/hive/:id" element={session ? <HiveDetail /> : <Navigate to="/login" replace />} />
       
-      {/* Redirection automatique si la page n'existe pas */}
+      {/* Redirection si l'URL est erronée */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
 
-/**
- * Composant Racine
- */
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // ÉTAPE CRUCIALE : On vérifie la session AVANT tout affichage
   useEffect(() => {
-    // Vérification initiale de la session au chargement
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
   }, []);
 
-  // Écran de chargement stylé
-  if (loading) return (
-    <div className="bg-[#020617] h-screen flex flex-col items-center justify-center gap-4">
-      <div className="animate-spin h-10 w-10 border-4 border-amber-500 border-t-transparent rounded-full" />
-      <span className="text-amber-500 font-black uppercase text-[10px] tracking-[0.3em]">Initialisation...</span>
-    </div>
-  );
+  // Écran d'attente propre
+  if (loading) {
+    return (
+      <div className="bg-[#020617] h-screen flex flex-col items-center justify-center gap-4">
+        <div className="animate-spin h-10 w-10 border-4 border-amber-500 border-t-transparent rounded-full" />
+        <span className="text-amber-500 font-black uppercase text-[10px] tracking-widest">Initialisation...</span>
+      </div>
+    );
+  }
 
   return (
     <Router>

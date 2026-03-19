@@ -1,84 +1,68 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import { supabase } from './lib/supabaseClient';
+import React, { useState } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import { useNavigate } from 'react-router-dom';
+import { LogIn, AlertCircle } from 'lucide-react';
 
-// Import de tes pages
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import AdminDashboard from './pages/AdminDashboard';
-import HiveDetail from './pages/HiveDetail';
-import LandingPage from './pages/LandingPage';
-import ForgotPassword from './pages/ForgotPassword';
-import UpdatePassword from './pages/UpdatePassword';
-
-// --- COMPOSANT DE NAVIGATION (Pour utiliser useNavigate correctement) ---
-function AppContent({ session, setSession }) {
+export default function Login() {
+  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // Écouteur de session unique
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
-      setSession(currentSession);
-      
-      // Si l'utilisateur est déconnecté ou supprimé, on nettoie et on redirige
-      if (event === 'SIGNED_OUT') {
-        navigate('/login');
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      if (authError) throw authError;
+
+      // Récupération du profil pour les droits
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('is_admin, is_approved')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      if (profile.is_admin) {
+        navigate('/admin-dashboard');
+      } else if (!profile.is_approved) {
+        await supabase.auth.signOut();
+        setError("Votre compte est en attente de validation.");
+      } else {
+        navigate('/dashboard');
       }
-    });
-
-    return () => {
-      if (subscription) subscription.unsubscribe();
-    };
-  }, [navigate, setSession]);
-
-  return (
-    <Routes>
-      {/* Routes Publiques */}
-      <Route path="/" element={!session ? <LandingPage /> : <Navigate to="/dashboard" replace />} />
-      <Route path="/login" element={!session ? <Login /> : <Navigate to="/dashboard" replace />} />
-      <Route path="/register" element={!session ? <Register /> : <Navigate to="/dashboard" replace />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<UpdatePassword />} />
-      
-      {/* Routes Privées */}
-      <Route path="/dashboard" element={session ? <Dashboard /> : <Navigate to="/login" replace />} />
-      <Route path="/admin-dashboard" element={session ? <AdminDashboard /> : <Navigate to="/login" replace />} />
-      <Route path="/hive/:id" element={session ? <HiveDetail /> : <Navigate to="/login" replace />} />
-      
-      {/* Sécurité : Si l'URL n'existe pas */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
-}
-
-// --- COMPOSANT RACINE ---
-export default function App() {
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  // RÈGLE D'OR : Les Hooks (useEffect) doivent TOUJOURS être en haut, 
-  // jamais après un "if (loading) return..."
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    } catch (err) {
+      setError(err.message);
+    } finally {
       setLoading(false);
-    });
-  }, []);
-
-  // On n'affiche le chargement qu'APRES avoir déclaré les hooks
-  if (loading) {
-    return (
-      <div className="bg-[#020617] h-screen flex flex-col items-center justify-center">
-        <div className="animate-spin h-10 w-10 border-4 border-amber-500 border-t-transparent rounded-full mb-4"></div>
-        <p className="text-amber-500 font-black uppercase text-[10px] tracking-widest">Initialisation...</p>
-      </div>
-    );
-  }
+    }
+  };
 
   return (
-    <Router>
-      <AppContent session={session} setSession={setSession} />
-    </Router>
+    <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6">
+      <div className="w-full max-w-md bg-slate-900/50 backdrop-blur-xl border border-white/10 p-10 rounded-[2.5rem] shadow-2xl">
+        <h1 className="text-3xl font-black text-white text-center mb-10 uppercase">Connexion</h1>
+        
+        {error && <div className="mb-6 flex items-center gap-3 bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl text-sm"><AlertCircle size={18} /> {error}</div>}
+
+        <form onSubmit={handleLogin} className="space-y-5">
+          <input type="email" placeholder="Email" required className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-white focus:outline-none focus:border-amber-500/50" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input type="password" placeholder="Mot de passe" required className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-white focus:outline-none focus:border-amber-500/50" value={password} onChange={(e) => setPassword(e.target.value)} />
+          
+          <button disabled={loading} className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-4 rounded-2xl shadow-xl shadow-amber-500/10 flex items-center justify-center gap-2">
+            {loading ? 'Chargement...' : <><LogIn size={20}/> Se connecter</>}
+          </button>
+        </form>
+
+        <p className="mt-8 text-center text-slate-400 text-sm">
+          Pas de compte ? <button onClick={() => navigate('/register')} className="text-amber-500 font-bold">Inscrivez-vous</button>
+        </p>
+      </div>
+    </div>
   );
 }
