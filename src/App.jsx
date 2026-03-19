@@ -2,137 +2,85 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'r
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from './lib/supabaseClient';
 
-// Pages
+// Import des Pages
 import Login from './pages/Login';
-import Register from './pages/Register'; // N'oublie pas de créer ce fichier
-import Dashboard from './pages/Dashboard'; // Ton Dashboard utilisateur
-import AdminDashboard from './pages/AdminDashboard'; // Ta page Admin
+import Register from './pages/Register';
+import Dashboard from './pages/Dashboard';
+import AdminDashboard from './pages/AdminDashboard';
 import HiveDetail from './pages/HiveDetail';
 import LandingPage from './pages/LandingPage';
 import ForgotPassword from './pages/ForgotPassword';
 import UpdatePassword from './pages/UpdatePassword';
 
-// Composant interne pour gérer la navigation et les écouteurs de session
-function AppContent({ session, setSession, resetTimer, showTimeoutModal, setShowTimeoutModal, logoutUser }) {
+/**
+ * AppContent gère la navigation et les écouteurs de session.
+ * Il doit être ENFANT de <Router> pour que useNavigate fonctionne.
+ */
+function AppContent({ session, setSession }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Écouteur global de session (déconnexion, suppression de compte, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
+    // Écouteur unique pour les changements d'état (Login, Logout, Suppression)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      setSession(currentSession);
+      
+      // Si l'utilisateur est déconnecté ou supprimé en base, on le renvoie au Login
       if (event === 'SIGNED_OUT') {
         navigate('/login');
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      if (subscription) subscription.unsubscribe();
+    };
   }, [navigate, setSession]);
 
   return (
-    <>
-      {/* MODAL DE TIMEOUT */}
-      {showTimeoutModal && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[9999] flex items-center justify-center p-6">
-          <div className="bg-slate-900 border border-amber-500/50 p-8 rounded-[2.5rem] max-w-sm text-center shadow-2xl">
-            <h2 className="text-2xl font-black text-amber-500 mb-4 italic uppercase tracking-tighter">Sécurité</h2>
-            <p className="text-slate-300 text-sm mb-8 font-medium">Votre session a expiré après 1 heure d'inactivité.</p>
-            <div className="flex flex-col gap-3">
-              <button 
-                onClick={() => { setShowTimeoutModal(false); resetTimer(); }}
-                className="bg-amber-500 text-black font-black py-4 rounded-2xl hover:bg-amber-400 transition-all uppercase text-[10px] tracking-widest"
-              >
-                Continuer la session
-              </button>
-              <button 
-                onClick={logoutUser}
-                className="text-slate-500 text-[10px] font-black uppercase tracking-widest py-2 hover:text-white transition-colors"
-              >
-                Se déconnecter
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <Routes>
-        {/* Public */}
-        <Route path="/" element={!session ? <LandingPage /> : <Navigate to="/dashboard" replace />} />
-        <Route path="/login" element={!session ? <Login /> : <Navigate to="/dashboard" replace />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<UpdatePassword />} />
-        
-        {/* Utilisateur Protégé */}
-        <Route path="/dashboard" element={session ? <Dashboard /> : <Navigate to="/login" replace />} />
-        <Route path="/hive/:id" element={session ? <HiveDetail /> : <Navigate to="/login" replace />} />
-        
-        {/* Admin Protégé */}
-        <Route path="/admin-dashboard" element={session ? <AdminDashboard /> : <Navigate to="/login" replace />} />
-        
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </>
+    <Routes>
+      {/* --- ROUTES PUBLIQUES --- */}
+      <Route path="/" element={!session ? <LandingPage /> : <Navigate to="/dashboard" replace />} />
+      <Route path="/login" element={!session ? <Login /> : <Navigate to="/dashboard" replace />} />
+      <Route path="/register" element={!session ? <Register /> : <Navigate to="/dashboard" replace />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<UpdatePassword />} />
+      
+      {/* --- ROUTES PROTÉGÉES (Nécessitent une session) --- */}
+      <Route path="/dashboard" element={session ? <Dashboard /> : <Navigate to="/login" replace />} />
+      <Route path="/admin-dashboard" element={session ? <AdminDashboard /> : <Navigate to="/login" replace />} />
+      <Route path="/hive/:id" element={session ? <HiveDetail /> : <Navigate to="/login" replace />} />
+      
+      {/* Redirection automatique si la page n'existe pas */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 
+/**
+ * Composant Racine
+ */
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showTimeoutModal, setShowTimeoutModal] = useState(false);
-  const timeoutTimer = useRef(null);
-
-  const logoutUser = async () => {
-    await supabase.auth.signOut();
-    setShowTimeoutModal(false);
-    setSession(null);
-  };
-
-  const resetTimer = () => {
-    if (timeoutTimer.current) clearTimeout(timeoutTimer.current);
-    if (session) {
-      timeoutTimer.current = setTimeout(() => {
-        setShowTimeoutModal(true);
-      }, 3600000); // 1 heure
-    }
-  };
 
   useEffect(() => {
+    // Vérification initiale de la session au chargement
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
+  }, []);
 
-    window.addEventListener('mousemove', resetTimer);
-    window.addEventListener('keydown', resetTimer);
-    window.addEventListener('click', resetTimer);
-
-    resetTimer();
-
-    return () => {
-      window.removeEventListener('mousemove', resetTimer);
-      window.removeEventListener('keydown', resetTimer);
-      window.removeEventListener('click', resetTimer);
-      if (timeoutTimer.current) clearTimeout(timeoutTimer.current);
-    };
-  }, [session]);
-
+  // Écran de chargement stylé
   if (loading) return (
-    <div className="bg-[#020617] h-screen flex items-center justify-center text-amber-500 font-black tracking-widest uppercase text-xs">
-      Chargement...
+    <div className="bg-[#020617] h-screen flex flex-col items-center justify-center gap-4">
+      <div className="animate-spin h-10 w-10 border-4 border-amber-500 border-t-transparent rounded-full" />
+      <span className="text-amber-500 font-black uppercase text-[10px] tracking-[0.3em]">Initialisation...</span>
     </div>
   );
 
   return (
     <Router>
-      <AppContent 
-        session={session} 
-        setSession={setSession} 
-        resetTimer={resetTimer} 
-        showTimeoutModal={showTimeoutModal} 
-        setShowTimeoutModal={setShowTimeoutModal} 
-        logoutUser={logoutUser} 
-      />
+      <AppContent session={session} setSession={setSession} />
     </Router>
   );
 }
