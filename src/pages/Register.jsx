@@ -29,7 +29,7 @@ export default function Register() {
     setLoading(true);
 
     try {
-      // 2. Inscription avec les métadonnées (Nom, Prénom, Tél)
+      // 2. Inscription avec les métadonnées pour l'automatisme
       const { data, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -38,7 +38,7 @@ export default function Register() {
             first_name: formData.firstName,
             last_name: formData.lastName,
             phone: formData.phone,
-            is_approved: false // Par défaut, non approuvé
+            is_approved: false 
           }
         }
       });
@@ -58,7 +58,7 @@ export default function Register() {
 
   return (
     <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 relative overflow-hidden">
-      {/* Background Decor */}
+      {/* Background Decor original */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-amber-500/10 blur-[120px] rounded-full" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full" />
 
@@ -67,8 +67,10 @@ export default function Register() {
           <ArrowLeft size={14} /> Retour
         </button>
 
-        <h1 className="text-3xl font-black text-white text-center mb-2 uppercase italic tracking-tighter">Créer un <span className="text-amber-500">Compte</span></h1>
-        <p className="text-slate-400 text-center text-sm mb-10 font-medium">Rejoignez le réseau des ruches connectées.</p>
+        <h1 className="text-3xl font-black text-white text-center mb-2 uppercase italic tracking-tighter">
+          Créer un <span className="text-amber-500">Compte</span>
+        </h1>
+        <p className="text-slate-400 text-center text-sm mb-10 font-medium italic">Rejoignez le réseau des ruches connectées.</p>
         
         {error && (
           <div className="mb-6 flex items-center gap-3 bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl text-sm italic font-medium">
@@ -122,11 +124,13 @@ export default function Register() {
             />
           </div>
 
-          <input 
-            type="password" placeholder="Confirmer le mot de passe" required 
-            className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-white text-sm focus:outline-none focus:border-amber-500/50" 
-            value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} 
-          />
+          <div className="relative">
+            <input 
+              type="password" placeholder="Confirmer le mot de passe" required 
+              className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-white text-sm focus:outline-none focus:border-amber-500/50" 
+              value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} 
+            />
+          </div>
 
           <button 
             disabled={loading} 

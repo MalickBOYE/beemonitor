@@ -45,12 +45,21 @@ export default function Dashboard() {
         .eq('id', user.id)
         .single();
 
-      if (!profileError) setProfile(profileData);
+      if (!profileError && profileData) {
+        setProfile(profileData);
+      } else {
+        // AUTOMATISME : Si la table profiles est vide, on utilise les métadonnées
+        setProfile({
+          first_name: user.user_metadata?.first_name || "Utilisateur",
+          last_name: user.user_metadata?.last_name || ""
+        });
+      }
 
       // 2. Récupérer les ruches
       await fetchHives();
     } catch (error) {
       console.error("Erreur lors du chargement des données:", error);
+      toast.error("Erreur de chargement du profil");
     } finally {
       setLoading(false);
     }
@@ -74,7 +83,10 @@ export default function Dashboard() {
     if (window.confirm("Supprimer cette ruche ?")) {
       const { error } = await supabase.from('hives').delete().eq('id', hiveId);
       if (error) toast.error("Erreur lors de la suppression");
-      else toast.success("Ruche supprimée");
+      else {
+        toast.success("Ruche supprimée");
+        fetchHives();
+      }
     }
   };
 
@@ -122,7 +134,10 @@ export default function Dashboard() {
               {profile ? `${profile.first_name} ${profile.last_name}` : 'Chargement...'}
             </span>
           </h2>
-          <p className="text-slate-400 mt-4 font-medium italic">Voici l'état actuel de votre rucher connecté.</p>
+          <p className="text-slate-400 mt-4 font-medium italic flex items-center gap-2">
+            <LayoutDashboard size={16} className="text-amber-500" />
+            Voici l'état actuel de votre rucher connecté.
+          </p>
         </div>
         
         {loading ? (
@@ -142,6 +157,7 @@ export default function Dashboard() {
               ))
             ) : (
               <div className="col-span-full py-20 text-center bg-white/5 border border-white/10 rounded-[2.5rem] backdrop-blur-sm">
+                <Beaker size={40} className="mx-auto text-slate-700 mb-4" />
                 <p className="text-slate-500 italic">Aucune ruche enregistrée pour le moment.</p>
               </div>
             )}
@@ -159,6 +175,7 @@ export default function Dashboard() {
           onSuccess={() => {
             setShowAddModal(false);
             fetchHives();
+            toast.success("Ruche ajoutée avec succès !");
           }}
         />
       )}
