@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import { LogIn, AlertCircle, Mail, Lock } from 'lucide-react';
+import { LogIn, Mail, Lock, AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
@@ -16,7 +16,7 @@ export default function Login() {
     setError(null);
 
     try {
-      // 1. Tentative de connexion
+      // 1. Connexion Auth
       const { data: { user }, error: authError } = await supabase.auth.signInWithPassword({ 
         email, 
         password 
@@ -24,7 +24,7 @@ export default function Login() {
 
       if (authError) throw authError;
 
-      // 2. Vérification du profil (Admin ou Approuvé)
+      // 2. Vérification des droits dans la table 'profiles'
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('is_admin, is_approved')
@@ -33,20 +33,18 @@ export default function Login() {
 
       if (profileError) throw profileError;
 
-      // 3. Redirection selon les droits
+      // 3. Redirection intelligente
       if (profile.is_admin) {
         navigate('/admin-dashboard');
       } else if (!profile.is_approved) {
-        // Si pas approuvé, on le déconnecte immédiatement pour bloquer l'accès
+        // On déconnecte si pas encore approuvé par l'admin
         await supabase.auth.signOut();
         setError("Votre compte est en attente de validation par l'administrateur.");
       } else {
         navigate('/dashboard');
       }
-
     } catch (err) {
       setError("Email ou mot de passe incorrect.");
-      console.error(err.message);
     } finally {
       setLoading(false);
     }
@@ -54,16 +52,16 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 relative overflow-hidden">
-      {/* Effets visuels de fond */}
+      {/* Background Decor */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-amber-500/10 blur-[120px] rounded-full" />
-      
+
       <div className="relative z-10 w-full max-w-md bg-slate-900/50 backdrop-blur-xl border border-white/10 p-10 rounded-[2.5rem] shadow-2xl">
         <h1 className="text-3xl font-black text-white text-center mb-10 uppercase italic tracking-tighter">
           Connexion
         </h1>
         
         {error && (
-          <div className="mb-6 flex items-center gap-3 bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl text-sm font-medium italic">
+          <div className="mb-6 flex items-center gap-3 bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl text-sm italic font-medium">
             <AlertCircle size={18} /> {error}
           </div>
         )}
@@ -72,23 +70,33 @@ export default function Login() {
           <div className="relative">
             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
             <input 
-              type="email" placeholder="Email" required 
+              type="email" 
+              placeholder="Email" 
+              required 
               className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 text-white text-sm focus:outline-none focus:border-amber-500/50" 
-              value={email} onChange={(e) => setEmail(e.target.value)} 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
             />
           </div>
 
           <div className="relative">
             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
             <input 
-              type="password" placeholder="Mot de passe" required 
+              type="password" 
+              placeholder="Mot de passe" 
+              required 
               className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 text-white text-sm focus:outline-none focus:border-amber-500/50" 
-              value={password} onChange={(e) => setPassword(e.target.value)} 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
             />
           </div>
           
           <div className="flex justify-end px-2">
-            <button type="button" onClick={() => navigate('/forgot-password')} className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-amber-500 transition-colors">
+            <button 
+              type="button" 
+              onClick={() => navigate('/forgot-password')} 
+              className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-amber-500 transition-colors"
+            >
               Mot de passe oublié ?
             </button>
           </div>
