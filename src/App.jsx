@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from './lib/supabaseClient';
 
@@ -7,8 +7,6 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import HiveDetail from './pages/HiveDetail';
 import LandingPage from './pages/LandingPage';
-
-// TES NOUVELLES PAGES (N'oublie pas de vérifier le chemin des fichiers)
 import ForgotPassword from './pages/ForgotPassword';
 import UpdatePassword from './pages/UpdatePassword';
 
@@ -17,12 +15,16 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [showTimeoutModal, setShowTimeoutModal] = useState(false);
   const timeoutTimer = useRef(null);
+  
+  // Grâce à main.jsx, on peut utiliser useNavigate ici en toute sécurité !
+  const navigate = useNavigate();
 
   // --- LOGIQUE DE SÉCURITÉ : TIMEOUT 1H ---
   const logoutUser = async () => {
     await supabase.auth.signOut();
     setShowTimeoutModal(false);
     setSession(null);
+    navigate('/login'); // Redirection propre vers le login
   };
 
   const resetTimer = () => {
@@ -35,15 +37,21 @@ export default function App() {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    // Vérification de la session au chargement
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+    // Écouteur de changements (Déconnexion, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+      setSession(currentSession);
+      if (_event === 'SIGNED_OUT') {
+        navigate('/login');
+      }
     });
 
+    // Écouteurs pour le timeout
     window.addEventListener('mousemove', resetTimer);
     window.addEventListener('keydown', resetTimer);
     window.addEventListener('click', resetTimer);
@@ -51,14 +59,15 @@ export default function App() {
     resetTimer();
 
     return () => {
-      subscription.unsubscribe();
+      subscription?.unsubscribe();
       window.removeEventListener('mousemove', resetTimer);
       window.removeEventListener('keydown', resetTimer);
       window.removeEventListener('click', resetTimer);
       if (timeoutTimer.current) clearTimeout(timeoutTimer.current);
     };
-  }, [session]);
+  }, [session, navigate]);
 
+  // Si ça charge, on affiche ton écran de chargement (mais les Hooks ont bien été lus !)
   if (loading) return (
     <div className="bg-[#020617] h-screen flex items-center justify-center text-amber-500 font-black tracking-widest uppercase text-xs">
       Chargement...
@@ -66,7 +75,7 @@ export default function App() {
   );
 
   return (
-    <Router>
+    <>
       {/* MODAL DE TIMEOUT */}
       {showTimeoutModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[9999] flex items-center justify-center p-6">
@@ -91,12 +100,13 @@ export default function App() {
         </div>
       )}
 
+      {/* On utilise juste <Routes>, sans <Router> autour */}
       <Routes>
         {/* Landing & Auth */}
         <Route path="/" element={!session ? <LandingPage /> : <Navigate to="/dashboard" replace />} />
         <Route path="/login" element={!session ? <Login /> : <Navigate to="/dashboard" replace />} />
         
-        {/* --- NOUVELLES ROUTES MOT DE PASSE (Toujours accessibles hors session) --- */}
+        {/* Mots de passe */}
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<UpdatePassword />} />
         
@@ -107,6 +117,6 @@ export default function App() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </Router>
+    </>
   );
 }
