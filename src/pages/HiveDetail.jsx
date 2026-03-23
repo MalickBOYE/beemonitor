@@ -26,12 +26,13 @@ export default function HiveDetail() {
   const [showSettings, setShowSettings] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
 
+  // Correction : On utilise les noms de colonnes de la base de données
   const last = data.length > 0 ? data[data.length - 1] : null;
 
   useEffect(() => {
     loadInitialData();
 
-    // ECOUTE CLOUD (WIFI) - Améliorée pour filtrer sur l'ID de la ruche
+    // ECOUTE CLOUD (WIFI)
     const channel = supabase.channel(`live_hive_${id}`)
       .on('postgres_changes', 
         { 
@@ -41,7 +42,6 @@ export default function HiveDetail() {
         }, 
         (payload) => {
           console.log("Nouvelle donnée reçue via WiFi:", payload.new);
-          // On ajoute la donnée seulement si elle n'existe pas déjà (évite les doublons)
           setData(prev => {
             const exists = prev.find(m => m.id === payload.new.id);
             if (exists) return prev;
@@ -60,7 +60,6 @@ export default function HiveDetail() {
   async function loadInitialData() {
     setLoading(true);
     try {
-      // 1. Récupérer les infos de la ruche
       const { data: hive, error: hiveError } = await supabase
         .from('hives')
         .select('*')
@@ -70,7 +69,6 @@ export default function HiveDetail() {
       if (hiveError) throw hiveError;
       setHiveInfo(hive);
 
-      // 2. Récupérer les mesures (on limite aux 100 dernières pour la performance)
       const { data: m, error: mError } = await supabase
         .from('measurements')
         .select('*')
@@ -110,8 +108,8 @@ export default function HiveDetail() {
         
         const measure = { 
           hive_id: id, 
-          temperature: parseFloat(temp), 
-          humidity: parseFloat(humi), 
+          temp_int: parseFloat(temp), // Modifié pour correspondre à la DB
+          hum_int: parseFloat(humi),   // Modifié pour correspondre à la DB
           weight: parseFloat(weight), 
           battery: parseFloat(batt), 
           created_at: new Date().toISOString() 
@@ -130,10 +128,11 @@ export default function HiveDetail() {
         toast.error("Aucune donnée à exporter");
         return;
     }
-    const headers = "Date,Heure,Poids(kg),Temp(C),Humi(%),Bat(%)\n";
+    const headers = "Date,Heure,Poids(kg),Temp_Int(C),Humi_Int(%),Bat(%)\n";
     const csvContent = data.map(m => {
       const d = new Date(m.created_at);
-      return `${d.toLocaleDateString()},${d.toLocaleTimeString()},${m.weight || 0},${m.temperature || 0},${m.humidity || 0},${m.battery || 0}`;
+      // Correction des clés pour l'export
+      return `${d.toLocaleDateString()},${d.toLocaleTimeString()},${m.weight || 0},${m.temp_int || 0},${m.hum_int || 0},${m.battery || 0}`;
     }).join("\n");
 
     const blob = new Blob([headers + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -200,8 +199,8 @@ export default function HiveDetail() {
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-16">
             <Kpi icon={<Scale/>} label="Masse" value={last?.weight} unit="kg" color="text-amber-400" />
-            <Kpi icon={<Thermometer/>} label="Interne" value={last?.temperature} unit="°C" color="text-orange-500" />
-            <Kpi icon={<Droplets/>} label="Humidité" value={last?.humidity} unit="%" color="text-blue-400" />
+            <Kpi icon={<Thermometer/>} label="Interne" value={last?.temp_int} unit="°C" color="text-orange-500" />
+            <Kpi icon={<Droplets/>} label="Humidité" value={last?.hum_int} unit="%" color="text-blue-400" />
             <Kpi icon={<Battery/>} label="Batterie" value={last?.battery} unit="%" color="text-emerald-500" />
           </div>
 
@@ -222,7 +221,7 @@ export default function HiveDetail() {
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
                   <XAxis 
                     dataKey="created_at" 
-                    tickFormatter={(str) => new Date(str).toLocaleTimeString('fr-FR', {hour: '2h', minute: '2m'})}
+                    tickFormatter={(str) => new Date(str).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}
                     stroke="#475569"
                     fontSize={9}
                     tickMargin={10}
@@ -234,9 +233,11 @@ export default function HiveDetail() {
                     itemStyle={{fontWeight: '900', textTransform: 'uppercase'}}
                   />
                   <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{paddingBottom: '20px', fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase'}} />
+                  
+                  {/* Mapping des dataKey avec les vrais noms de colonnes de la DB */}
                   <Line name="Poids" type="monotone" dataKey="weight" stroke="#fbbf24" strokeWidth={4} dot={false} activeDot={{ r: 6, fill: '#fbbf24' }} />
-                  <Line name="Temp" type="monotone" dataKey="temperature" stroke="#f97316" strokeWidth={2} dot={false} />
-                  <Line name="Humi" type="monotone" dataKey="humidity" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                  <Line name="Temp" type="monotone" dataKey="temp_int" stroke="#f97316" strokeWidth={2} dot={false} />
+                  <Line name="Humi" type="monotone" dataKey="hum_int" stroke="#3b82f6" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

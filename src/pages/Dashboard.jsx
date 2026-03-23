@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
-import { Plus, LogOut, LayoutDashboard, Beaker } from 'lucide-react';
+import { Plus, LogOut, LayoutDashboard, Beaker, ShieldCheck } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 // Imports des composants
@@ -21,7 +21,7 @@ export default function Dashboard() {
   useEffect(() => {
     fetchInitialData();
 
-    // Abonnement temps réel pour les changements sur les ruches
+    // Abonnement temps réel
     const channel = supabase.channel('dashboard_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'hives' }, () => fetchHives())
       .subscribe();
@@ -29,7 +29,6 @@ export default function Dashboard() {
     return () => supabase.removeChannel(channel);
   }, []);
 
-  // Fonction pour charger le profil ET les ruches
   async function fetchInitialData() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -38,39 +37,49 @@ export default function Dashboard() {
         return;
       }
 
-      // 1. Récupérer les infos du profil (Prénom/Nom)
-      const { data: profileData, error: profileError } = await supabase
+      // 1. Récupérer le profil réel depuis la table 'profiles'
+      const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
 
-      if (!profileError && profileData) {
+      if (profileData) {
         setProfile(profileData);
       } else {
-        // AUTOMATISME : Si la table profiles est vide, on utilise les métadonnées
+        // Backup si le profil n'est pas encore créé par le trigger
         setProfile({
           first_name: user.user_metadata?.first_name || "Utilisateur",
-          last_name: user.user_metadata?.last_name || ""
+          last_name: user.user_metadata?.last_name || "",
+          is_admin: false
         });
       }
 
-      // 2. Récupérer les ruches
-      await fetchHives();
+      // 2. Charger les ruches (en passant l'ID user et le statut admin)
+      await fetchHives(user.id, profileData?.is_admin);
     } catch (error) {
-      console.error("Erreur lors du chargement des données:", error);
-      toast.error("Erreur de chargement du profil");
+      console.error("Erreur:", error);
+      toast.error("Erreur de chargement du dashboard");
     } finally {
       setLoading(false);
     }
   }
 
-  async function fetchHives() {
-    const { data } = await supabase
-      .from('hives')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (data) setHives(data);
+  async function fetchHives(userId, isAdmin = false) {
+    let query = supabase.from('hives').select('*');
+
+    // SI l'utilisateur n'est PAS admin, on ne lui montre que SES ruches
+    if (!isAdmin) {
+      query = query.eq('user_id', userId);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error("Erreur fetchHives:", error);
+    } else {
+      setHives(data || []);
+    }
   }
 
   const handleLogout = async () => {
@@ -80,13 +89,15 @@ export default function Dashboard() {
 
   const handleDeleteHive = async (e, hiveId) => {
     e.stopPropagation();
-    if (window.confirm("Supprimer cette ruche ?")) {
+    if (window.confirm("Supprimer cette ruche ? Toutes les mesures associées seront perdues.")) {
       const { error } = await supabase.from('hives').delete().eq('id', hiveId);
       if (error) {
-        toast.error("Erreur lors de la suppression");
+        toast.error("Action refusée ou erreur de serveur");
       } else {
         toast.success("Ruche supprimée");
-        fetchHives(); // Rafraîchit la liste après suppression
+        // On rafraîchit avec les données actuelles
+        const { data: { user } } = await supabase.auth.getUser();
+        fetchHives(user.id, profile?.is_admin);
       }
     }
   };
@@ -96,13 +107,14 @@ export default function Dashboard() {
       <Toaster position="top-right" />
       <BackgroundSlider />
 
-      {/* --- BARRE DE NAVIGATION --- */}
       <nav className="relative z-20 flex items-center justify-between px-8 py-6 bg-slate-900/40 backdrop-blur-xl border-b border-white/5">
         <div className="flex items-center gap-4">
           <img src={logo} alt="Logo" className="h-10 w-auto" />
           <div className="flex flex-col">
             <h1 className="text-lg font-black uppercase tracking-tighter leading-none">Beemonitor</h1>
-            <span className="text-[8px] text-amber-500 font-bold uppercase tracking-[0.3em]">Live Intelligence</span>
+            <span className="text-[8px] text-amber-500 font-bold uppercase tracking-[0.3em]">
+              {profile?.is_admin ? "Administration Mode" : "Live Intelligence"}
+            </span>
           </div>
         </div>
 
@@ -124,20 +136,20 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      {/* --- CONTENU PRINCIPAL --- */}
       <main className="relative z-10 max-w-7xl mx-auto px-8 py-16 w-full flex-grow">
-        
-        {/* TITRE BIENVENUE DYNAMIQUE */}
         <div className="mb-12">
           <h2 className="text-5xl font-black uppercase italic tracking-tighter leading-none">
             Bienvenue <br />
-            <span className="text-amber-500">
+            <span className="text-amber-500 flex items-center gap-3">
               {profile ? `${profile.first_name} ${profile.last_name}` : 'Chargement...'}
+              {profile?.is_admin && <ShieldCheck className="text-emerald-500" size={32} title="Compte Administrateur" />}
             </span>
           </h2>
           <p className="text-slate-400 mt-4 font-medium italic flex items-center gap-2">
             <LayoutDashboard size={16} className="text-amber-500" />
-            Voici l'état actuel de votre rucher connecté.
+            {profile?.is_admin 
+              ? "Vue globale de toutes les ruches du réseau (Admin)." 
+              : "Voici l'état actuel de votre rucher connecté."}
           </p>
         </div>
         
@@ -168,19 +180,18 @@ export default function Dashboard() {
 
       <Footer />
 
-      {/* MODALE D'AJOUT */}
       {showAddModal && (
         <AddHiveModal 
           isOpen={showAddModal} 
           onClose={() => setShowAddModal(false)} 
-          onSuccess={() => {
-            fetchHives(); // Rafraîchit les données
-            setShowAddModal(false); // Ferme la modale
-            toast.success("Ruche ajoutée avec succès !");
+          onSuccess={async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            fetchHives(user.id, profile?.is_admin);
+            setShowAddModal(false);
+            toast.success("Ruche ajoutée !");
           }}
         />
       )}
     </div>
   );
-  
 }
