@@ -108,8 +108,8 @@ export default function HiveDetail() {
         
         const measure = { 
           hive_id: id, 
-          temp_int: parseFloat(temp), // Modifié pour correspondre à la DB
-          hum_int: parseFloat(humi),   // Modifié pour correspondre à la DB
+          temp_int: parseFloat(temp), 
+          hum_int: parseFloat(humi), 
           weight: parseFloat(weight), 
           battery: parseFloat(batt), 
           created_at: new Date().toISOString() 
@@ -131,7 +131,6 @@ export default function HiveDetail() {
     const headers = "Date,Heure,Poids(kg),Temp_Int(C),Humi_Int(%),Bat(%)\n";
     const csvContent = data.map(m => {
       const d = new Date(m.created_at);
-      // Correction des clés pour l'export
       return `${d.toLocaleDateString()},${d.toLocaleTimeString()},${m.weight || 0},${m.temp_int || 0},${m.hum_int || 0},${m.battery || 0}`;
     }).join("\n");
 
@@ -234,7 +233,6 @@ export default function HiveDetail() {
                   />
                   <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{paddingBottom: '20px', fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase'}} />
                   
-                  {/* Mapping des dataKey avec les vrais noms de colonnes de la DB */}
                   <Line name="Poids" type="monotone" dataKey="weight" stroke="#fbbf24" strokeWidth={4} dot={false} activeDot={{ r: 6, fill: '#fbbf24' }} />
                   <Line name="Temp" type="monotone" dataKey="temp_int" stroke="#f97316" strokeWidth={2} dot={false} />
                   <Line name="Humi" type="monotone" dataKey="hum_int" stroke="#3b82f6" strokeWidth={2} dot={false} />
