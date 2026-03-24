@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts';
 import { 
   ArrowLeft, Bluetooth, Wifi, Thermometer, Droplets, 
-  Battery, Scale, Download, MapPin, Activity, Settings, Trash2 
+  Battery, Scale, Download, MapPin, Activity, Settings, 
+  Trash2, AlertTriangle, CheckCircle, Eye, Zap 
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -26,17 +27,21 @@ export default function HiveDetail() {
   const [showSettings, setShowSettings] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
 
-  // Correction : On utilise les noms de colonnes de la base de données
+  // Nouveaux états IA et Alertes
+  const [beeCount, setBeeCount] = useState(0);
+  const [isOffline, setIsOffline] = useState(false);
+
   const last = data.length > 0 ? data[data.length - 1] : null;
 
+  // --- 1. INITIALISATION & REALTIME (WiFi) ---
   useEffect(() => {
     loadInitialData();
 
-    // ECOUTE CLOUD (WIFI)
     const channel = supabase.channel(`live_hive_${id}`)
       .on('postgres_changes', 
         { 
           event: 'INSERT', 
+          schema: 'public', 
           table: 'measurements', 
           filter: `hive_id=eq.${id}` 
         }, 
@@ -47,7 +52,10 @@ export default function HiveDetail() {
             if (exists) return prev;
             return [...prev, payload.new].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
           });
-          toast.success("Ruche mise à jour (WiFi)");
+          
+          // Vérification immédiate des seuils
+          checkThresholds(payload.new);
+          toast.success("Données synchronisées (Cloud)");
         }
       )
       .subscribe();
@@ -57,6 +65,34 @@ export default function HiveDetail() {
     };
   }, [id]);
 
+  // --- 2. SURVEILLANCE INACTIVITÉ (1h15 = 75 mins) ---
+  useEffect(() => {
+    const checkInactivity = () => {
+      if (!last) return;
+      const lastUpdate = new Date(last.created_at).getTime();
+      const now = new Date().getTime();
+      const diffMinutes = (now - lastUpdate) / (1000 * 60);
+      
+      if (diffMinutes > 75) {
+        setIsOffline(true);
+      } else {
+        setIsOffline(false);
+      }
+    };
+
+    const interval = setInterval(checkInactivity, 30000); // Check toutes les 30s
+    checkInactivity();
+    return () => clearInterval(interval);
+  }, [last]);
+
+  // --- 3. ANALYSE SEUILS CRITIQUES ---
+  const checkThresholds = (m) => {
+    if (m.temp_int < 32) toast.error("TEMPÉRATURE CRITIQUE : < 32°C", { duration: 6000 });
+    if (m.hum_int < 45) toast.error("HUMIDITÉ CRITIQUE : < 45%", { duration: 6000 });
+    if (m.weight >= 80) toast.success("RÉCOLTE PRÊTE : 80kg atteints !", { icon: '🍯', duration: 10000 });
+  };
+
+  // --- 4. CHARGEMENT INITIAL ---
   async function loadInitialData() {
     setLoading(true);
     try {
@@ -78,16 +114,33 @@ export default function HiveDetail() {
 
       if (mError) throw mError;
       setData(m || []);
+      
+      // Lancer la détection IA après le chargement
+      fetchBeeDetection();
 
     } catch (error) {
       console.error("Erreur de chargement:", error.message);
-      toast.error("Erreur lors de la récupération des données");
+      toast.error("Erreur lors de la récupération");
     } finally {
       setLoading(false);
     }
   }
 
-  // --- BLUETOOTH ---
+  // --- 5. VISION IA (Roboflow) ---
+  const fetchBeeDetection = async () => {
+    // Note: Remplace 'URL_DE_TON_IMAGE' par le lien de la photo prise par ton ESP32-CAM
+    try {
+      const response = await fetch(
+        `https://detect.roboflow.com/bee_detection-9mugi/31?api_key=qxEfJm6Lz6pTmsrUpqzQ&image=URL_DE_TON_IMAGE_ESP32`
+      );
+      const result = await response.json();
+      setBeeCount(result.predictions?.length || 0);
+    } catch (err) {
+      console.log("IA non disponible ou pas d'image");
+    }
+  };
+
+  // --- 6. BLUETOOTH (Fonction Originale Restaurée) ---
   const connectBluetooth = async () => {
     try {
       const device = await navigator.bluetooth.requestDevice({ 
@@ -107,6 +160,7 @@ export default function HiveDetail() {
         const [temp, humi, weight, batt] = raw.split(',');
         
         const measure = { 
+          id: Date.now(),
           hive_id: id, 
           temp_int: parseFloat(temp), 
           hum_int: parseFloat(humi), 
@@ -115,6 +169,7 @@ export default function HiveDetail() {
           created_at: new Date().toISOString() 
         };
         setData(prev => [...prev, measure]);
+        checkThresholds(measure);
       });
     } catch (err) { 
       console.error(err);
@@ -122,7 +177,7 @@ export default function HiveDetail() {
     }
   };
 
-  // --- EXPORT fichier CSV ---
+  // --- 7. EXPORT CSV (Fonction Originale Restaurée) ---
   const exportToCSV = () => {
     if (data.length === 0) {
         toast.error("Aucune donnée à exporter");
@@ -151,15 +206,22 @@ export default function HiveDetail() {
 
   return (
     <div className="min-h-screen bg-[#020617] text-white flex flex-col relative overflow-x-hidden font-sans">
-      <Toaster position="bottom-center" />
+      <Toaster position="top-right" />
       <BackgroundSlider />
 
+      {/* --- NAVBAR --- */}
       <nav className="relative z-10 flex items-center justify-between px-4 md:px-8 py-6 backdrop-blur-md bg-black/20 border-b border-white/5">
         <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-slate-500 hover:text-white transition-all font-black uppercase text-[10px] tracking-widest">
           <ArrowLeft size={18}/> Retour
         </button>
 
         <div className="flex items-center gap-2 md:gap-4">
+          {/* Badge de Statut Dynamique */}
+          <div className={`hidden md:flex items-center gap-2 px-4 py-1.5 rounded-full border ${isOffline ? 'bg-red-500/10 border-red-500/50 text-red-500' : 'bg-emerald-500/10 border-emerald-500/50 text-emerald-500'} text-[9px] font-black uppercase tracking-widest`}>
+            {isOffline ? <AlertTriangle size={12}/> : <CheckCircle size={12}/>}
+            {isOffline ? 'Ruche Déconnectée' : 'Système Online'}
+          </div>
+
           <div className="flex gap-2 mr-2 md:mr-4 border-r border-white/10 pr-2 md:pr-4">
             <button onClick={() => setShowSettings(true)} className="p-2 md:p-3 bg-white/5 rounded-xl text-slate-400 hover:text-amber-500 transition-all border border-white/5" title="Paramètres">
               <Settings size={18} />
@@ -175,7 +237,7 @@ export default function HiveDetail() {
           
           <div className="flex bg-black/40 p-1 rounded-2xl border border-white/10 backdrop-blur-xl shadow-2xl">
               <div className="flex items-center gap-2 px-3 md:px-4 py-2 text-amber-500 font-black text-[9px] uppercase tracking-widest">
-                <Wifi size={14} className="animate-pulse" /> Cloud
+                <Wifi size={14} className={isOffline ? "" : "animate-pulse"} /> Cloud
               </div>
               <button onClick={connectBluetooth} className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl text-[9px] font-black transition-all uppercase tracking-widest ${isBleConnected ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-500 hover:text-white'}`}>
                 <Bluetooth size={14}/> {isBleConnected ? 'Direct' : 'Bluetooth'}
@@ -184,34 +246,58 @@ export default function HiveDetail() {
         </div>
       </nav>
 
+      {/* --- MAIN CONTENT --- */}
       <main className="relative z-10 max-w-7xl mx-auto px-4 md:px-8 py-12 w-full flex-grow">
         <div className="bg-slate-900/40 border border-white/10 rounded-[2.5rem] md:rounded-[3.5rem] p-6 md:p-16 backdrop-blur-3xl shadow-2xl">
           
-          <div className="mb-12">
-            <h1 className="text-4xl md:text-7xl font-black italic tracking-tighter text-amber-500 uppercase leading-tight">
-              {hiveInfo?.name || "Sans Nom"}
-            </h1>
-            <p className="flex items-center gap-2 text-slate-500 text-[10px] md:text-xs font-bold uppercase mt-4 tracking-[0.3em]">
-              <MapPin size={16} className="text-amber-500" /> {hiveInfo?.address || "Lieu non défini"}
-            </p>
+          <div className="flex flex-col lg:flex-row justify-between items-start mb-12 gap-8">
+            <div>
+              <h1 className="text-4xl md:text-7xl font-black italic tracking-tighter text-amber-500 uppercase leading-tight">
+                {hiveInfo?.name || "Sans Nom"}
+              </h1>
+              <p className="flex items-center gap-2 text-slate-500 text-[10px] md:text-xs font-bold uppercase mt-4 tracking-[0.3em]">
+                <MapPin size={16} className="text-amber-500" /> {hiveInfo?.address || "Lieu non défini"}
+              </p>
+            </div>
+
+            {/* Carte Vision IA Roboflow */}
+            <div className="bg-black/40 border border-amber-500/30 p-6 rounded-[2rem] flex items-center gap-6 shadow-xl w-full lg:w-auto">
+              <div className="h-16 w-16 bg-amber-500/20 rounded-2xl flex items-center justify-center text-amber-500">
+                <Eye size={32} />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 italic">Vision Intel (Roboflow)</span>
+                <div className="text-3xl font-black text-white">{beeCount} <span className="text-sm text-amber-500 uppercase">Abeilles</span></div>
+              </div>
+            </div>
           </div>
 
+          {/* Bannière Alerte Inactivité */}
+          {isOffline && (
+            <div className="mb-8 p-6 bg-red-500/20 border border-red-500/50 rounded-3xl flex items-center gap-4 text-red-200 animate-pulse">
+              <AlertTriangle size={24} />
+              <div>
+                <p className="font-black uppercase text-xs tracking-widest">Alerte Électronique</p>
+                <p className="text-sm opacity-80 font-medium">Aucun signal reçu depuis plus de 1h15. Vérifiez l'alimentation ou le signal WiFi.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Grille des KPIs avec Alertes visuelles */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-16">
-            <Kpi icon={<Scale/>} label="Masse" value={last?.weight} unit="kg" color="text-amber-400" />
-            <Kpi icon={<Thermometer/>} label="Interne" value={last?.temp_int} unit="°C" color="text-orange-500" />
-            <Kpi icon={<Droplets/>} label="Humidité" value={last?.hum_int} unit="%" color="text-blue-400" />
+            <Kpi icon={<Scale/>} label="Masse" value={last?.weight} unit="kg" color="text-amber-400" alert={last?.weight >= 80} />
+            <Kpi icon={<Thermometer/>} label="Interne" value={last?.temp_int} unit="°C" color="text-orange-500" alert={last?.temp_int < 32} />
+            <Kpi icon={<Droplets/>} label="Humidité" value={last?.hum_int} unit="%" color="text-blue-400" alert={last?.hum_int < 45} />
             <Kpi icon={<Battery/>} label="Batterie" value={last?.battery} unit="%" color="text-emerald-500" />
           </div>
 
+          {/* Graphique avec Tooltip stylisé */}
           <div className="bg-black/30 rounded-[2rem] md:rounded-[2.5rem] p-4 md:p-10 border border-white/5 shadow-inner">
             <div className="flex items-center justify-between mb-8 ml-4">
               <div className="flex items-center gap-3">
                 <Activity size={18} className="text-amber-500" />
-                <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Live Data Analytics</h3>
+                <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Flux de Données Temps Réel</h3>
               </div>
-              <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full border border-white/5">
-                {data.length} points enregistrés
-              </span>
             </div>
             
             <div className="h-[350px] md:h-[450px] w-full">
@@ -264,9 +350,10 @@ export default function HiveDetail() {
   );
 }
 
-const Kpi = ({ icon, label, value, unit, color }) => (
-  <div className="bg-[#0f172a]/60 border border-white/5 p-5 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] hover:bg-white/5 transition-all group shadow-xl">
-    <div className={`flex items-center gap-3 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] mb-4 ${color} opacity-80 group-hover:opacity-100`}>
+// Composant KPI amélioré pour gérer l'état d'alerte
+const Kpi = ({ icon, label, value, unit, color, alert }) => (
+  <div className={`bg-[#0f172a]/60 border ${alert ? 'border-red-500 animate-pulse' : 'border-white/5'} p-5 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] hover:bg-white/5 transition-all group shadow-xl`}>
+    <div className={`flex items-center gap-3 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] mb-4 ${alert ? 'text-red-500' : color} opacity-80 group-hover:opacity-100`}>
       {icon} {label}
     </div>
     <div className="text-2xl md:text-4xl font-black tracking-tighter">
