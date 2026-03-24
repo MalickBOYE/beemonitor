@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
-import { Plus, LogOut, LayoutDashboard, Beaker, ShieldCheck } from 'lucide-react';
+import { Plus, LogOut, LayoutDashboard, Beaker, ShieldCheck, AlertTriangle, CheckCircle } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 // Imports des composants
@@ -21,13 +21,21 @@ export default function Dashboard() {
   useEffect(() => {
     fetchInitialData();
 
-    // Abonnement temps réel
+    // Abonnement temps réel : On écoute les changements sur 'hives' ET 'measurements'
+    // pour mettre à jour le statut en direct si une donnée arrive
     const channel = supabase.channel('dashboard_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'hives' }, () => fetchHives())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'hives' }, () => refreshData())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'measurements' }, () => refreshData())
       .subscribe();
 
     return () => supabase.removeChannel(channel);
   }, []);
+
+  // Fonction pour rafraîchir sans relancer tout le chargement du profil
+  async function refreshData() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) fetchHives(user.id, profile?.is_admin);
+  }
 
   async function fetchInitialData() {
     try {
@@ -37,26 +45,20 @@ export default function Dashboard() {
         return;
       }
 
-      // 1. Récupérer le profil réel depuis la table 'profiles'
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
 
-      if (profileData) {
-        setProfile(profileData);
-      } else {
-        // Backup si le profil n'est pas encore créé par le trigger
-        setProfile({
-          first_name: user.user_metadata?.first_name || "Utilisateur",
-          last_name: user.user_metadata?.last_name || "",
-          is_admin: false
-        });
-      }
-
-      // 2. Charger les ruches (en passant l'ID user et le statut admin)
-      await fetchHives(user.id, profileData?.is_admin);
+      const currentProfile = profileData || {
+        first_name: user.user_metadata?.first_name || "Utilisateur",
+        last_name: user.user_metadata?.last_name || "",
+        is_admin: false
+      };
+      
+      setProfile(currentProfile);
+      await fetchHives(user.id, currentProfile.is_admin);
     } catch (error) {
       console.error("Erreur:", error);
       toast.error("Erreur de chargement du dashboard");
@@ -66,19 +68,59 @@ export default function Dashboard() {
   }
 
   async function fetchHives(userId, isAdmin = false) {
-    let query = supabase.from('hives').select('*');
+    // On sélectionne la ruche ET la dernière mesure associée (limit 1)
+    let query = supabase
+      .from('hives')
+      .select(`
+        *,
+        measurements (
+          temp_int,
+          hum_int,
+          weight,
+          created_at
+        )
+      `)
+      // On demande de trier les mesures pour avoir la plus récente en premier
+      .order('created_at', { foreignTable: 'measurements', ascending: false });
 
-    // SI l'utilisateur n'est PAS admin, on ne lui montre que SES ruches
     if (!isAdmin) {
       query = query.eq('user_id', userId);
     }
 
-    const { data, error } = await query.order('created_at', { ascending: false });
+    const { data, error } = await query;
     
     if (error) {
       console.error("Erreur fetchHives:", error);
     } else {
-      setHives(data || []);
+      // Pour chaque ruche, on calcule son statut "réel"
+      const hivesWithStatus = (data || []).map(hive => {
+        const lastM = hive.measurements?.[0]; // On prend la mesure la plus récente
+        let status = "online";
+        let alerts = [];
+
+        if (lastM) {
+          const diffMinutes = (new Date() - new Date(lastM.created_at)) / (1000 * 60);
+          
+          // 1. Check Inactivité (1h15 = 75 mins)
+          if (diffMinutes > 75) status = "offline";
+
+          // 2. Check Seuils Alertes
+          if (lastM.temp_int < 32) alerts.push("Température basse");
+          if (lastM.hum_int < 45) alerts.push("Humidité basse");
+          if (lastM.weight >= 80) alerts.push("Récolte prête");
+        } else {
+          status = "no_data";
+        }
+
+        return { 
+          ...hive, 
+          status, 
+          alerts,
+          last_data: lastM 
+        };
+      });
+
+      setHives(hivesWithStatus);
     }
   }
 
@@ -95,15 +137,13 @@ export default function Dashboard() {
         toast.error("Action refusée ou erreur de serveur");
       } else {
         toast.success("Ruche supprimée");
-        // On rafraîchit avec les données actuelles
-        const { data: { user } } = await supabase.auth.getUser();
-        fetchHives(user.id, profile?.is_admin);
+        refreshData();
       }
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] text-white flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-[#020617] text-white flex flex-col relative overflow-hidden font-sans">
       <Toaster position="top-right" />
       <BackgroundSlider />
 
@@ -161,12 +201,33 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {hives.length > 0 ? (
               hives.map((hive) => (
-                <HiveCard 
-                  key={hive.id} 
-                  hive={hive} 
-                  onNavigate={() => navigate(`/hive/${hive.id}`)}
-                  onDelete={(e) => handleDeleteHive(e, hive.id)}
-                />
+                <div key={hive.id} className="relative group">
+                  {/* Petit badge d'état sur la carte */}
+                  <div className={`absolute -top-3 -right-3 z-30 px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest shadow-xl border ${
+                    hive.status === 'offline' ? 'bg-red-500 border-red-400 text-white animate-pulse' : 
+                    hive.alerts.length > 0 ? 'bg-orange-500 border-orange-400 text-white' : 
+                    'bg-emerald-500 border-emerald-400 text-white'
+                  }`}>
+                    {hive.status === 'offline' ? 'Déconnectée' : hive.alerts.length > 0 ? 'Alerte' : 'En ligne'}
+                  </div>
+
+                  <HiveCard 
+                    hive={hive} 
+                    onNavigate={() => navigate(`/hive/${hive.id}`)}
+                    onDelete={(e) => handleDeleteHive(e, hive.id)}
+                  />
+                  
+                  {/* Overlay d'alerte si problème */}
+                  {hive.alerts.length > 0 && hive.status !== 'offline' && (
+                    <div className="absolute bottom-24 left-6 z-20 flex gap-2">
+                       {hive.alerts.map((a, i) => (
+                         <span key={i} className="bg-orange-500/20 backdrop-blur-md border border-orange-500/50 text-orange-500 text-[7px] font-bold px-2 py-1 rounded-md uppercase">
+                           {a}
+                         </span>
+                       ))}
+                    </div>
+                  )}
+                </div>
               ))
             ) : (
               <div className="col-span-full py-20 text-center bg-white/5 border border-white/10 rounded-[2.5rem] backdrop-blur-sm">
@@ -184,12 +245,7 @@ export default function Dashboard() {
         <AddHiveModal 
           isOpen={showAddModal} 
           onClose={() => setShowAddModal(false)} 
-          onSuccess={async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            fetchHives(user.id, profile?.is_admin);
-            setShowAddModal(false);
-            toast.success("Ruche ajoutée !");
-          }}
+          onSuccess={refreshData}
         />
       )}
     </div>
