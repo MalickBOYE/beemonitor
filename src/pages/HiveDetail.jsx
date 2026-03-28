@@ -14,6 +14,7 @@ import BackgroundSlider from '../components/BackgroundSlider';
 import Footer from '../components/Footer';
 import HiveSettingsModal from '../components/HiveSettingsModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import WeatherWidget from '../components/WeatherWidget'; // <-- Nouvel import Météo
 
 export default function HiveDetail() {
   const { id } = useParams();
@@ -251,13 +252,22 @@ export default function HiveDetail() {
         <div className="bg-slate-900/40 border border-white/10 rounded-[2.5rem] md:rounded-[3.5rem] p-6 md:p-16 backdrop-blur-3xl shadow-2xl">
           
           <div className="flex flex-col lg:flex-row justify-between items-start mb-12 gap-8">
-            <div>
-              <h1 className="text-4xl md:text-7xl font-black italic tracking-tighter text-amber-500 uppercase leading-tight">
-                {hiveInfo?.name || "Sans Nom"}
-              </h1>
-              <p className="flex items-center gap-2 text-slate-500 text-[10px] md:text-xs font-bold uppercase mt-4 tracking-[0.3em]">
-                <MapPin size={16} className="text-amber-500" /> {hiveInfo?.address || "Lieu non défini"}
-              </p>
+            <div className="flex flex-col gap-4"> {/* Container pour le nom, adresse ET widget météo */}
+              <div>
+                <h1 className="text-4xl md:text-7xl font-black italic tracking-tighter text-amber-500 uppercase leading-tight">
+                  {hiveInfo?.name || "Sans Nom"}
+                </h1>
+                <p className="flex items-center gap-2 text-slate-500 text-[10px] md:text-xs font-bold uppercase mt-4 tracking-[0.3em] mb-4">
+                  <MapPin size={16} className="text-amber-500" /> {hiveInfo?.address || "Lieu non défini"}
+                </p>
+              </div>
+              
+              {/* --- WIDGET METEO ICI --- */}
+              {hiveInfo?.address && (
+                <div className="w-full max-w-sm">
+                  <WeatherWidget address={hiveInfo.address} />
+                </div>
+              )}
             </div>
 
             {/* Carte Vision IA Roboflow */}
