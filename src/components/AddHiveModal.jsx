@@ -10,7 +10,6 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
     name: '',
     address: '',
     alert_phone: '',
-    mac_address: '' // Nouvel état pour l'adresse MAC
   });
 
   // --- LOGIQUE AUTO-COMPLÉTION ADRESSE (API GOUV) ---
