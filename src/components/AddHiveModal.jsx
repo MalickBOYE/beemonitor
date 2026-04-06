@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { X, Layout, MapPin, Phone, Loader2, Search, Cpu } from 'lucide-react';
+import { X, Layout, MapPin, Phone, Loader2, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) {
@@ -12,7 +12,7 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
     alert_phone: '',
   });
 
-  // --- LOGIQUE AUTO-COMPLÉTION ADRESSE (API GOUV) ---
+  // --- LOGIQUE AUTO-COMPLÉTION ADRESSE ---
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (formData.address.length > 3) {
@@ -31,23 +31,36 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
     return () => clearTimeout(delayDebounceFn);
   }, [formData.address]);
 
+  // --- LOGIQUE DE SOUMISSION ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-      const { error } = await supabase.from('hives').insert([
-        {
-          name: formData.name,      
-          address: formData.address,
-          alert_phone: formData.alert_phone,
-          user_id: user.id
-        }
-      ]);
+      if (userError || !user) {
+        toast.error("Session expirée, reconnectez-vous.");
+        return;
+      }
 
-      if (error) throw error;
+      // On insère uniquement les colonnes qui existent réellement
+      const { error } = await supabase
+        .from('hives')
+        .insert([
+          {
+            name: formData.name,      
+            address: formData.address,
+            alert_phone: formData.alert_phone,
+            user_id: user.id
+          }
+        ]);
+
+      if (error) {
+        console.error("Détails de l'erreur Supabase:", error);
+        toast.error(`Erreur : ${error.message}`);
+        return;
+      }
 
       toast.success('Ruche enregistrée avec succès !');
       
@@ -55,12 +68,15 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
       if (onRefresh) onRefresh();
       
       onClose(); 
-    }  finally {
+    } catch (err) {
+      console.error("Erreur inattendue:", err);
+      toast.error("Une erreur est survenue.");
+    } finally {
       setLoading(false);
     }
   };
 
-  if (isOpen === false) return null;
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -91,7 +107,8 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
           </div>
-          {/* LOCALISATION AVEC SUGGESTIONS API */}
+
+          {/* LOCALISATION */}
           <div className="relative">
             <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3">
               <MapPin size={14} className="text-amber-500" /> @ Localisation
@@ -128,7 +145,7 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
             )}
           </div>
 
-          {/* TÉLÉPHONE D'ALERTE */}
+          {/* TÉLÉPHONE */}
           <div>
             <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3">
               <Phone size={14} className="text-amber-500" /> ! Téléphone d'alerte
@@ -151,7 +168,7 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
             {loading ? (
               <>
                 <Loader2 className="animate-spin" size={20} />
-                <span>Traitement en cours...</span>
+                <span>Enregistrement...</span>
               </>
             ) : (
               'Enregistrer la ruche'
