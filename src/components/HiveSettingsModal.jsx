@@ -6,8 +6,7 @@ import toast from 'react-hot-toast';
 export default function HiveSettingsModal({ hive, onClose, onRefresh }) {
   const [formData, setFormData] = useState({
     name: hive.name || '',
-    address: hive.address || '',
-    mac_address: hive.mac_address || '' // Nouvel état pour la MAC
+    address: hive.address || ''
   });
 
   const handleUpdate = async (e) => {
@@ -18,7 +17,6 @@ export default function HiveSettingsModal({ hive, onClose, onRefresh }) {
       .update({ 
         name: formData.name, 
         address: formData.address,
-        mac_address: formData.mac_address.trim().toUpperCase() // Nettoyage de la MAC
       })
       .eq('id', hive.id);
 
@@ -60,26 +58,6 @@ export default function HiveSettingsModal({ hive, onClose, onRefresh }) {
               />
             </div>
           </div>
-
-          {/* ID BOÎTIER (MAC) */}
-          <div>
-            <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest ml-2">ID Boîtier (Adresse MAC)</label>
-            <div className="relative mt-2">
-              <Cpu className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-500" size={16} />
-              <input 
-                type="text" 
-                required
-                placeholder="AA:BB:CC:DD:EE:FF"
-                value={formData.mac_address}
-                className="w-full bg-white/5 border border-amber-500/30 p-4 pl-12 rounded-2xl text-white outline-none focus:border-amber-500 transition-all font-bold placeholder:text-slate-600"
-                onChange={e => setFormData({...formData, mac_address: e.target.value})}
-              />
-            </div>
-            <p className="text-[9px] text-slate-500 mt-2 italic px-2">
-              Identifiant matériel nécessaire pour la réception des données.
-            </p>
-          </div>
-
           {/* LOCALISATION */}
           <div>
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Localisation (Adresse)</label>
