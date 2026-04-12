@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { X, Layout, MapPin, Phone, Loader2, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { geocodeAddress } from '../components/utils'; // Vérifie que le chemin est correct
 
 export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) {
   const [loading, setLoading] = useState(false);
@@ -41,10 +42,20 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
 
       if (userError || !user) {
         toast.error("Session expirée, reconnectez-vous.");
+        setLoading(false);
         return;
       }
 
-      // On insère uniquement les colonnes qui existent réellement
+      // 1. Appel du géocodage avant l'insertion
+      const coords = await geocodeAddress(formData.address);
+
+      if (!coords) {
+        toast.error("Localisation GPS introuvable pour cette adresse.");
+        setLoading(false);
+        return;
+      }
+
+      // 2. Insertion avec les noms de colonnes exacts de Supabase
       const { error } = await supabase
         .from('hives')
         .insert([
@@ -52,12 +63,14 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
             name: formData.name,      
             address: formData.address,
             alert_phone: formData.alert_phone,
+            latitude: coords.latitude,   // Nom exact de ta base
+            longitude: coords.longitude, // Nom exact de ta base
             user_id: user.id
           }
         ]);
 
       if (error) {
-        console.error("Détails de l'erreur Supabase:", error);
+        console.error("Erreur Supabase:", error);
         toast.error(`Erreur : ${error.message}`);
         return;
       }
@@ -93,7 +106,6 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
 
         <form onSubmit={handleSubmit} className="space-y-6">
           
-          {/* IDENTIFICATION */}
           <div>
             <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3">
               <Layout size={14} className="text-amber-500" /> # Identification
@@ -108,7 +120,6 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
             />
           </div>
 
-          {/* LOCALISATION */}
           <div className="relative">
             <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3">
               <MapPin size={14} className="text-amber-500" /> @ Localisation
@@ -145,7 +156,6 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
             )}
           </div>
 
-          {/* TÉLÉPHONE */}
           <div>
             <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3">
               <Phone size={14} className="text-amber-500" /> ! Téléphone d'alerte
