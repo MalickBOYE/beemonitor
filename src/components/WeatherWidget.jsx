@@ -126,7 +126,6 @@ export default function WeatherWidget({ lat, lng, cityName }) {
           </div>
         </div>
 
-        {/* CARTE ALERTES ET CONSEILS */}
         {/* CARTE ALERTES ET PRÉVISIONS (CORRIGÉE) */}
 <div className={`p-4 rounded-2xl border backdrop-blur-md shadow-xl transition-all duration-500 ${alert ? 'bg-red-500/10 border-red-500/30' : 'bg-emerald-500/10 border-emerald-500/30'}`}>
   <div className="flex justify-between items-start mb-3">
