@@ -127,23 +127,26 @@ export default function WeatherWidget({ lat, lng, cityName }) {
         </div>
 
         {/* CARTE ALERTES ET CONSEILS */}
-        <div className={`p-4 rounded-2xl border backdrop-blur-md shadow-xl transition-all duration-500 ${alert ? 'bg-red-500/10 border-red-500/30 ring-1 ring-red-500/20' : 'bg-emerald-500/10 border-emerald-500/30'}`}>
-          <div className="flex justify-between items-start mb-3">
-            <span className={`text-[9px] font-black uppercase tracking-widest ${alert ? 'text-red-400' : 'text-emerald-400'}`}>
-              {alert ? "Vigilance Critique" : "Stabilité Climatique"}
-            </span>
-            {alert ? <AlertTriangle size={18} className="text-red-400 animate-pulse" /> : <CheckCircle size={18} className="text-emerald-400" />}
-          </div>
-          <p className="text-white text-sm leading-snug font-medium pr-4">
-            {alert ? alert : "Les capteurs ne détectent aucune anomalie majeure pour vos colonies."}
-          </p>
-          {!alert && (
-            <div className="mt-4 flex items-center gap-2 text-emerald-400/60 uppercase text-[8px] font-black tracking-widest">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></div>
-              Système en veille active
-            </div>
-          )}
-        </div>
+        {/* CARTE ALERTES ET PRÉVISIONS (CORRIGÉE) */}
+<div className={`p-4 rounded-2xl border backdrop-blur-md shadow-xl transition-all duration-500 ${alert ? 'bg-red-500/10 border-red-500/30' : 'bg-emerald-500/10 border-emerald-500/30'}`}>
+  <div className="flex justify-between items-start mb-3">
+    <span className={`text-[9px] font-black uppercase tracking-widest ${alert ? 'text-red-400' : 'text-emerald-400'}`}>
+      {alert ? "Vigilance Météo" : "Analyse du Ciel"}
+    </span>
+    {alert ? <AlertTriangle size={18} className="text-red-400 animate-pulse" /> : <CheckCircle size={18} className="text-emerald-400" />}
+  </div>
+  
+  <p className="text-white text-sm leading-snug font-medium pr-4">
+    {alert ? alert : "Les données satellites ne prévoient aucun événement climatique critique pour vos ruches."}
+  </p>
+
+  {!alert && (
+    <div className="mt-4 flex items-center gap-2 text-emerald-400/60 uppercase text-[8px] font-black tracking-widest">
+      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+      Synchronisation Cloud OK
+    </div>
+  )}
+</div>
 
       </div>
     </div>
