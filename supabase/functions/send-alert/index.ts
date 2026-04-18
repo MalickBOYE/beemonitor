@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Resend } from "npm:resend@0.17.2";
 
 // 1. Correction de l'accès à la clé API (Deno utilise Deno.env.get)
-const resendKey = Deno.env.get("RESEND_API_KEY");
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 // 2. INITIALISATION CRITIQUE : Tu dois créer l'instance 'resend'
 const resend = new Resend(resendKey);
