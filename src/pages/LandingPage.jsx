@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.png'; 
 import techHive from '../assets/Ruche.png'; 
+import sopraLogo from '../assets/sopra.png';
 
 const backgroundImages = [
   "https://images.unsplash.com/photo-1587334274328-64186a80aeee", 
@@ -51,6 +52,14 @@ export default function LandingPage() {
             <div className="absolute inset-0 bg-cyan-950/60" />
           </div>
         ))}
+        {/* 2. INSERTION DU LOGO SOPRA ICI */}
+          <div className="mb-8 bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/20">
+            <img 
+              src={sopraLogo} 
+              alt="Sopra Steria" 
+              className="h-12 md:h-16 w-auto brightness-0 invert" // Rend le logo blanc pour qu'il ressorte sur le fond sombre
+            />
+          </div>
         <div className="relative z-10 text-center px-4 max-w-4xl">
           <h1 className="text-5xl md:text-7xl font-black text-white mb-6 drop-shadow-lg">
             Protéger les abeilles grâce à la <span className="text-amber-400">technologie</span>
