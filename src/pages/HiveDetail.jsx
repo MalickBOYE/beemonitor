@@ -131,6 +131,54 @@ export default function HiveDetail() {
       <span className="font-black tracking-[0.3em] text-[10px] uppercase">Liaison en cours...</span>
     </div>
   );
+  // --- LOGIQUE DE SURVEILLANCE PANNE ÉLECTRONIQUE ---
+useEffect(() => {
+  const checkSystemHealth = async () => {
+    if (!last || !hiveInfo) return;
+
+    const lastUpdate = new Date(last.created_at).getTime();
+    const nowTime = new Date().getTime();
+    const diffMinutes = (nowTime - lastUpdate) / (1000 * 60);
+    
+    const hour = new Date().getHours();
+    const isDaytime = hour > 7 && hour < 21; // Actif uniquement en journée
+
+    // Condition : En journée + silence radio > 75 minutes
+    if (isDaytime && diffMinutes > 75) {
+      
+      // On évite le spam (un seul mail par session de panne)
+      const alertSent = sessionStorage.getItem(`inactivity_alert_${id}`);
+      
+      if (!alertSent) {
+        try {
+          // APPEL DE TA FONCTION SUPABASE "send-alert"
+          await supabase.functions.invoke('send-alert', {
+            body: { 
+              hive_name: hiveInfo.name, 
+              alert_type: 'PANNE SYSTÈME', // Nouveau type
+              value: Math.round(diffMinutes), // On envoie le temps d'absence
+              email: 'boye.malick02@gmail.com' 
+            }
+          });
+          
+          sessionStorage.setItem(`inactivity_alert_${id}`, 'true');
+          toast.error("Système muet : Alerte technique envoyée", { icon: '🔧' });
+        } catch (err) {
+          console.error("Erreur Trigger Inactivité:", err);
+        }
+      }
+    } else if (diffMinutes < 10) {
+      // Si les données reviennent (diff < 10 min), on réautorise une future alerte
+      sessionStorage.removeItem(`inactivity_alert_${id}`);
+    }
+  };
+
+  // On vérifie toutes les 5 minutes pour ne pas surcharger le processeur
+  const healthInterval = setInterval(checkSystemHealth, 300000); 
+  checkSystemHealth();
+  
+  return () => clearInterval(healthInterval);
+}, [last, hiveInfo, id]);
 
   return (
     <div className="min-h-screen bg-[#020617] text-white flex flex-col font-sans">

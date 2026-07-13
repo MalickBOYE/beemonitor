@@ -5,13 +5,10 @@ import {
   Users, 
   CheckCircle, 
   XCircle, 
-  Mail, 
-  Calendar, 
   Search, 
   Clock,
   UserCheck,
   ShieldAlert,
-  LogOut,
   ArrowLeft
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
@@ -22,34 +19,13 @@ export default function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
 
-  const ADMIN_EMAIL = 'admin@rucheconnectee.com';
-
   useEffect(() => {
-    checkAdminAndFetchData();
+    fetchProfiles();
   }, []);
-
-  async function checkAdminAndFetchData() {
-    try {
-      setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user || user.email !== ADMIN_EMAIL) {
-        toast.error("Accès non autorisé");
-        navigate('/dashboard');
-        return;
-      }
-
-      await fetchProfiles();
-    } catch (error) {
-      console.error("Erreur admin:", error);
-    } finally {
-      // Sécurité pour éviter le blocage infini de l'écran
-      setLoading(false);
-    }
-  }
 
   async function fetchProfiles() {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -60,6 +36,8 @@ export default function AdminDashboard() {
     } catch (error) {
       toast.error("Impossible de charger les profils");
       console.error(error);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -85,7 +63,6 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-[#020617] text-white p-8 font-sans">
       <Toaster position="top-right" />
       
-      {/* BARRE DE NAVIGATION ADMIN */}
       <nav className="max-w-7xl mx-auto mb-12 flex items-center justify-between bg-slate-900/40 p-6 rounded-[2rem] border border-white/5 backdrop-blur-xl">
         <div className="flex items-center gap-4">
           <div className="bg-amber-500 p-3 rounded-2xl shadow-lg shadow-amber-500/20">
@@ -93,7 +70,6 @@ export default function AdminDashboard() {
           </div>
           <div>
             <h1 className="text-xl font-black uppercase italic leading-none tracking-tighter">Panneau <span className="text-amber-500">Admin</span></h1>
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Session: {ADMIN_EMAIL}</p>
           </div>
         </div>
         
@@ -101,13 +77,9 @@ export default function AdminDashboard() {
             <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-white transition-colors text-xs font-bold uppercase">
                 <ArrowLeft size={16} /> Retour App
             </button>
-            <button onClick={() => supabase.auth.signOut().then(() => navigate('/login'))} className="p-3 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all">
-                <LogOut size={20} />
-            </button>
         </div>
       </nav>
 
-      {/* RECHERCHE ET STATS */}
       <div className="max-w-7xl mx-auto mb-10 grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-2 relative">
           <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
@@ -137,7 +109,6 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* TABLEAU DES MEMBRES */}
       <div className="max-w-7xl mx-auto bg-white/5 border border-white/10 rounded-[2.5rem] overflow-hidden backdrop-blur-sm">
         <table className="w-full text-left">
           <thead>
@@ -150,7 +121,7 @@ export default function AdminDashboard() {
           </thead>
           <tbody className="divide-y divide-white/5">
             {loading ? (
-                <tr><td colSpan="4" className="py-20 text-center text-slate-500 italic">Chargement sécurisé des profils...</td></tr>
+                <tr><td colSpan="4" className="py-20 text-center text-slate-500 italic">Chargement des profils...</td></tr>
             ) : filteredProfiles.length === 0 ? (
                 <tr><td colSpan="4" className="py-20 text-center text-slate-500 italic">Aucun profil trouvé.</td></tr>
             ) : filteredProfiles.map((user) => (
