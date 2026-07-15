@@ -11,13 +11,12 @@ import {
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
-// Sous-composants
 import BackgroundSlider from '../components/BackgroundSlider';
 import Footer from '../components/Footer';
 import HiveSettingsModal from '../components/HiveSettingsModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import WeatherWidget from '../components/WeatherWidget';
-import HiveStats from '../components/HiveStats'; // Utilisation du composant dédié
+import HiveStats from '../components/HiveStats';
 import { getBeeCount } from '../services/beeCount';
 
 export default function HiveDetail() {
@@ -35,13 +34,11 @@ export default function HiveDetail() {
 
   const last = data.length > 0 ? data[data.length - 1] : null;
 
-  // Rafraîchissement horloge pour le statut
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
-  // --- LOGIQUE IA ---
   const analyzeBees = useCallback(async (imageUrl, measurementId) => {
     if (!imageUrl) return;
     try {
@@ -53,7 +50,6 @@ export default function HiveDetail() {
     }
   }, []);
 
-  // --- CHARGEMENT ---
   const loadInitialData = useCallback(async () => {
     setLoading(true);
     try {
@@ -84,7 +80,49 @@ export default function HiveDetail() {
     return () => { supabase.removeChannel(channel); };
   }, [id, loadInitialData, analyzeBees]);
 
-  // --- ACTIONS ---
+  useEffect(() => {
+    const checkSystemHealth = async () => {
+      const lastData = data[data.length - 1];
+      if (!lastData || !hiveInfo) return;
+
+      const lastUpdate = new Date(lastData.created_at).getTime();
+      const nowTime = new Date().getTime();
+      const diffMinutes = (nowTime - lastUpdate) / (1000 * 60);
+      
+      const hour = new Date().getHours();
+      const isDaytime = hour > 7 && hour < 21;
+
+      if (isDaytime && diffMinutes > 75) {
+        const alertSent = sessionStorage.getItem(`inactivity_alert_${id}`);
+        
+        if (!alertSent) {
+          try {
+            await supabase.functions.invoke('send-alert', {
+              body: { 
+                hive_name: hiveInfo.name, 
+                alert_type: 'PANNE SYSTÈME',
+                value: Math.round(diffMinutes),
+                email: 'boye.malick02@gmail.com' 
+              }
+            });
+            
+            sessionStorage.setItem(`inactivity_alert_${id}`, 'true');
+            toast.error("Système muet : Alerte technique envoyée", { icon: '🔧' });
+          } catch (err) {
+            console.error("Erreur Trigger Inactivité:", err);
+          }
+        }
+      } else if (diffMinutes < 10) {
+        sessionStorage.removeItem(`inactivity_alert_${id}`);
+      }
+    };
+
+    const healthInterval = setInterval(checkSystemHealth, 300000); 
+    checkSystemHealth();
+    
+    return () => clearInterval(healthInterval);
+  }, [id, hiveInfo, data]);
+
   const exportToCSV = () => {
     if (data.length === 0) return toast.error("Aucune donnée");
     const headers = "Date,Heure,Poids(kg),Temp_Int(C),Temp_Ext(C),Humi_Int(%),Humi_Ext(%),Abeilles\n";
@@ -111,7 +149,6 @@ export default function HiveDetail() {
     } catch (err) { toast.error("Échec Bluetooth"); }
   };
 
-  // --- GESTION DU STATUT (DYNAMIQUE) ---
   const getStatus = () => {
     if (!last) return { label: "Inactif", color: "text-slate-500", icon: <WifiOff size={12}/> };
     const diff = (now - new Date(last.created_at)) / 60000;
@@ -125,60 +162,13 @@ export default function HiveDetail() {
 
   const status = getStatus();
 
+  // Le `return` anticipé se trouve BIEN APRÈS l'appel de tous les Hooks
   if (loading) return (
     <div className="h-screen bg-[#020617] flex flex-col items-center justify-center text-amber-500 gap-4">
       <Activity className="animate-spin" size={32} />
       <span className="font-black tracking-[0.3em] text-[10px] uppercase">Liaison en cours...</span>
     </div>
   );
-  // --- LOGIQUE DE SURVEILLANCE PANNE ÉLECTRONIQUE ---
-useEffect(() => {
-  const checkSystemHealth = async () => {
-    if (!last || !hiveInfo) return;
-
-    const lastUpdate = new Date(last.created_at).getTime();
-    const nowTime = new Date().getTime();
-    const diffMinutes = (nowTime - lastUpdate) / (1000 * 60);
-    
-    const hour = new Date().getHours();
-    const isDaytime = hour > 7 && hour < 21; // Actif uniquement en journée
-
-    // Condition : En journée + silence radio > 75 minutes
-    if (isDaytime && diffMinutes > 75) {
-      
-      // On évite le spam (un seul mail par session de panne)
-      const alertSent = sessionStorage.getItem(`inactivity_alert_${id}`);
-      
-      if (!alertSent) {
-        try {
-          // APPEL DE TA FONCTION SUPABASE "send-alert"
-          await supabase.functions.invoke('send-alert', {
-            body: { 
-              hive_name: hiveInfo.name, 
-              alert_type: 'PANNE SYSTÈME', // Nouveau type
-              value: Math.round(diffMinutes), // On envoie le temps d'absence
-              email: 'boye.malick02@gmail.com' 
-            }
-          });
-          
-          sessionStorage.setItem(`inactivity_alert_${id}`, 'true');
-          toast.error("Système muet : Alerte technique envoyée", { icon: '🔧' });
-        } catch (err) {
-          console.error("Erreur Trigger Inactivité:", err);
-        }
-      }
-    } else if (diffMinutes < 10) {
-      // Si les données reviennent (diff < 10 min), on réautorise une future alerte
-      sessionStorage.removeItem(`inactivity_alert_${id}`);
-    }
-  };
-
-  // On vérifie toutes les 5 minutes pour ne pas surcharger le processeur
-  const healthInterval = setInterval(checkSystemHealth, 300000); 
-  checkSystemHealth();
-  
-  return () => clearInterval(healthInterval);
-}, [last, hiveInfo, id]);
 
   return (
     <div className="min-h-screen bg-[#020617] text-white flex flex-col font-sans">
@@ -236,7 +226,6 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* COMPOSANT KPI DES CAPTEURS ARDUINO AVEC ALERTES */}
           <HiveStats lastData={last} />
 
           <div className="bg-black/30 rounded-[2.5rem] p-10 border border-white/5 h-[500px]">

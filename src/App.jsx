@@ -1,32 +1,25 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
-import React from 'react';
-
-// Pages
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
+import Login from './pages/Login';
+import Register from './pages/Register';
 import HiveDetail from './pages/HiveDetail';
-import AdminDashboard from './pages/AdminDashboard';
-import LandingPage from './pages/LandingPage';
 
 export default function App() {
   return (
-    <Routes>
-      {/* Redirection directe vers les données */}
-      <Route path="/" element={<Dashboard />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      
-      {/* Routes de données accessibles publiquement */}
-      <Route path="/hive/:id" element={<HiveDetail />} />
-      <Route path="/admin" element={<AdminDashboard />} />
-      
-      {/* Anciennes routes d'authentification redirigées vers le Dashboard */}
-      <Route path="/login" element={<Navigate to="/dashboard" replace />} />
-      <Route path="/register" element={<Navigate to="/dashboard" replace />} />
-      <Route path="/forgot-password" element={<Navigate to="/dashboard" replace />} />
-      <Route path="/reset-password" element={<Navigate to="/dashboard" replace />} />
-      <Route path="/pending" element={<Navigate to="/dashboard" replace />} />
-      
-      {/* Fallback */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <Router>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        
+        {/* Route dynamique vers les détails de la ruche */}
+        <Route path="/hive/:id" element={<HiveDetail />} />
+        
+        {/* Sécurité : Redirection vers l'accueil si l'URL est inconnue */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
   );
 }
