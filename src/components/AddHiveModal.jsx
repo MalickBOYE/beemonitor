@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { X, Layout, MapPin, Phone, Loader2, Search } from 'lucide-react';
+import { X, Layout, MapPin, Loader2, Search } from 'lucide-react'; // Retrait de l'icône Phone
 import toast from 'react-hot-toast';
 import { geocodeAddress } from '../components/utils'; // Vérifie que le chemin est correct
 
@@ -10,7 +10,6 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
   const [formData, setFormData] = useState({
     name: '',
     address: '',
-    alert_phone: '',
   });
 
   // --- LOGIQUE AUTO-COMPLÉTION ADRESSE ---
@@ -55,16 +54,15 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
         return;
       }
 
-      // 2. Insertion avec les noms de colonnes exacts de Supabase
+      // 2. Insertion sans 'alert_phone' pour correspondre parfaitement à ton schéma
       const { error } = await supabase
         .from('hives')
         .insert([
           {
             name: formData.name,      
-            address: formData.address,
-            alert_phone: formData.alert_phone,
-            latitude: coords.latitude,   // Nom exact de ta base
-            longitude: coords.longitude, // Nom exact de ta base
+            location: formData.address, // Clé 'location' de ta base de données
+            latitude: coords.latitude,   
+            longitude: coords.longitude, 
             user_id: user.id
           }
         ]);
@@ -77,6 +75,12 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
 
       toast.success('Ruche enregistrée avec succès !');
       
+      // Réinitialisation du formulaire
+      setFormData({
+        name: '',
+        address: '',
+      });
+
       if (onSuccess) onSuccess();
       if (onRefresh) onRefresh();
       
@@ -93,7 +97,7 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="bg-[#0f172a] border border-white/10 w-full max-w-lg rounded-[2.5rem] p-10 shadow-2xl relative animate-in fade-in zoom-in duration-200">
+      <div className="bg-[#0f172a] border border-white/10 w-full max-w-lg rounded-[2.5rem] p-10 shadow-2xl relative animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800">
         
         <div className="flex justify-between items-center mb-10">
           <h2 className="text-3xl font-black italic uppercase tracking-tighter text-white">
@@ -106,6 +110,7 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
 
         <form onSubmit={handleSubmit} className="space-y-6">
           
+          {/* IDENTIFICATION */}
           <div>
             <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3">
               <Layout size={14} className="text-amber-500" /> # Identification
@@ -120,6 +125,7 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
             />
           </div>
 
+          {/* LOCALISATION (LOCATION) */}
           <div className="relative">
             <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3">
               <MapPin size={14} className="text-amber-500" /> @ Localisation
@@ -156,24 +162,11 @@ export default function AddHiveModal({ onClose, onRefresh, onSuccess, isOpen }) 
             )}
           </div>
 
-          <div>
-            <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3">
-              <Phone size={14} className="text-amber-500" /> ! Téléphone d'alerte
-            </label>
-            <input
-              required
-              type="tel"
-              placeholder="Ex: +33 6 12 34 56 78"
-              className="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-white font-bold focus:border-amber-500/50 outline-none transition-all"
-              value={formData.alert_phone}
-              onChange={(e) => setFormData({ ...formData, alert_phone: e.target.value })}
-            />
-          </div>
-
+          {/* BOUTON D'ENREGISTREMENT */}
           <button 
             type="submit" 
             disabled={loading} 
-            className="w-full bg-amber-500 hover:bg-white text-black py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] mt-4 transition-all active:scale-95 shadow-lg shadow-amber-500/20 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-amber-500 hover:bg-white text-black py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] mt-8 transition-all active:scale-95 shadow-lg shadow-amber-500/20 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>

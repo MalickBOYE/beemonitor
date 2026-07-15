@@ -91,7 +91,7 @@ export default function HiveCard({ hive, onNavigate, onDelete }) {
         </h3>
         
         <p className="text-slate-500 text-[10px] font-bold uppercase mb-8 flex items-center gap-1 tracking-widest">
-          <MapPin size={12} className="text-amber-500"/> {hive.address || "ADRESSE NON DÉFINIE"}
+          <MapPin size={12} className="text-amber-500"/> {hive.location || "ADRESSE NON DÉFINIE"}
         </p>
         
         <div className="grid grid-cols-2 gap-4 mb-8">

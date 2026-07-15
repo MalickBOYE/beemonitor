@@ -9,10 +9,14 @@ import BackgroundSlider from '../components/BackgroundSlider';
 import Footer from '../components/Footer';
 import logo from '../assets/logo.png';
 
+// IMPORTATION DU MODAL (Ajuste le chemin relatif si ton fichier est placé ailleurs)
+import AddHiveModal from "../components/AddHiveModal";
+
 export default function Dashboard() {
   const [hives, setHives] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false); // État de visibilité du modal
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -106,7 +110,7 @@ export default function Dashboard() {
           
           {isAdmin && (
             <button 
-              onClick={() => navigate('/add-hive')}
+              onClick={() => setIsModalOpen(true)} // Modification ici : ouvre le modal local au lieu de naviguer
               className="bg-amber-500 hover:bg-white text-black font-black py-3 px-6 rounded-2xl transition-all uppercase text-[10px] tracking-widest flex items-center gap-2"
             >
               <Plus size={16} /> Ajouter une ruche
@@ -148,6 +152,13 @@ export default function Dashboard() {
         </div>
       </main>
       
+      {/* INTÉGRATION DU MODAL ET DE SES ÉTATS */}
+      <AddHiveModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onRefresh={fetchHives} 
+      />
+
       <Footer />
     </div>
   );
