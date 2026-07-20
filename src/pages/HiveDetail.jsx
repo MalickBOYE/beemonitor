@@ -31,6 +31,9 @@ export default function HiveDetail() {
   const [showSettings, setShowSettings] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [now, setNow] = useState(new Date());
+  
+  // NOUVEAU STATE : Gestion de la période d'affichage (24h par défaut)
+  const [timeframe, setTimeframe] = useState('24h');
 
   const last = data.length > 0 ? data[data.length - 1] : null;
 
@@ -50,14 +53,30 @@ export default function HiveDetail() {
     }
   }, []);
 
+  // MISE À JOUR DE LA REQUÊTE : Filtrage dynamique par date selon la période choisie
   const loadInitialData = useCallback(async () => {
     setLoading(true);
     try {
       const { data: hive } = await supabase.from('hives').select('*').eq('id', id).single();
       setHiveInfo(hive);
 
-      const { data: m } = await supabase.from('measurements')
-        .select('*').eq('hive_id', id).order('created_at', { ascending: true }).limit(100);
+      // Calcul de la date limite en fonction du choix utilisateur
+      let query = supabase.from('measurements').select('*').eq('hive_id', id);
+      const cutoffDate = new Date();
+
+      if (timeframe === '24h') {
+        cutoffDate.setHours(cutoffDate.getHours() - 24);
+        query = query.gte('created_at', cutoffDate.toISOString());
+      } else if (timeframe === '7d') {
+        cutoffDate.setDate(cutoffDate.getDate() - 7);
+        query = query.gte('created_at', cutoffDate.toISOString());
+      } else if (timeframe === '30d') {
+        cutoffDate.setDate(cutoffDate.getDate() - 30);
+        query = query.gte('created_at', cutoffDate.toISOString());
+      }
+
+      // Tri chronologique ascendant pour le graphique
+      const { data: m } = await query.order('created_at', { ascending: true });
       
       setData(m || []);
       if (m?.[m.length - 1]?.bee_count) setBeeCount(m[m.length - 1].bee_count);
@@ -66,7 +85,7 @@ export default function HiveDetail() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, timeframe]); // timeframe ajouté en dépendance pour redéclencher le fetch au clic
 
   useEffect(() => {
     loadInitialData();
@@ -162,8 +181,7 @@ export default function HiveDetail() {
 
   const status = getStatus();
 
-  // Le `return` anticipé se trouve BIEN APRÈS l'appel de tous les Hooks
-  if (loading) return (
+  if (loading && data.length === 0) return (
     <div className="h-screen bg-[#020617] flex flex-col items-center justify-center text-amber-500 gap-4">
       <Activity className="animate-spin" size={32} />
       <span className="font-black tracking-[0.3em] text-[10px] uppercase">Liaison en cours...</span>
@@ -228,17 +246,48 @@ export default function HiveDetail() {
 
           <HiveStats lastData={last} />
 
-          <div className="bg-black/30 rounded-[2.5rem] p-10 border border-white/5 h-[500px]">
-            <div className="flex items-center gap-3 mb-8 ml-4">
-              <Activity size={18} className="text-amber-500" />
-              <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Flux de données</h3>
+          {/* SECTION GRAPHIQUE METAMORPHOSÉE AVEC LE SÉLECTEUR DE TIME-FRAME */}
+          <div className="bg-black/30 rounded-[2.5rem] p-10 border border-white/5 h-[500px] mt-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 ml-4 gap-4">
+              <div className="flex items-center gap-3">
+                <Activity size={18} className="text-amber-500" />
+                <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Flux de données</h3>
+              </div>
+              
+              {/* COMPOSANT DE COMMUTATION INTERFACE */}
+              <div className="flex bg-black/40 p-1 rounded-xl border border-white/10 backdrop-blur-xl self-start sm:self-auto">
+                <button 
+                  onClick={() => setTimeframe('24h')} 
+                  className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${timeframe === '24h' ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                >
+                  24 Heures
+                </button>
+                <button 
+                  onClick={() => setTimeframe('7d')} 
+                  className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${timeframe === '7d' ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                >
+                  7 Jours
+                </button>
+                <button 
+                  onClick={() => setTimeframe('30d')} 
+                  className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${timeframe === '30d' ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                >
+                  30 Jours
+                </button>
+              </div>
             </div>
+            
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
                 <XAxis 
                   dataKey="created_at" 
-                  tickFormatter={(t) => new Date(t).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})} 
+                  tickFormatter={(t) => {
+                    const d = new Date(t);
+                    return timeframe === '24h' 
+                      ? d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})
+                      : d.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'});
+                  }} 
                   stroke="#475569" fontSize={10} 
                 />
                 <YAxis stroke="#475569" fontSize={10} axisLine={false} tickLine={false} />
