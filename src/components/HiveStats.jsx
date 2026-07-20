@@ -1,33 +1,86 @@
 import React from 'react';
-import { Scale, Thermometer, Droplets, Battery } from 'lucide-react';
-
-const Kpi = ({ icon, label, value, unit, colorClass = "group-hover:text-amber-500" }) => (
-  <div className="bg-white/5 border border-white/5 p-8 rounded-[2rem] hover:bg-white/10 transition-all group">
-    <div className={`flex items-center gap-3 text-slate-500 text-[11px] font-black uppercase tracking-widest mb-4 ${colorClass} transition-colors`}>
-      {icon} {label}
-    </div>
-    <div className="text-4xl font-black italic">
-      {value ?? '--'} 
-      <span className="text-sm text-slate-600 ml-1 font-medium not-italic">{unit}</span>
-    </div>
-  </div>
-);
+import { Scale, Battery, Thermometer, Droplets } from 'lucide-react';
 
 export default function HiveStats({ lastData }) {
-  return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
-      {/* Ligne 1 : Vitalité & Énergie */}
-      <Kpi icon={<Scale/>} label="Poids" value={lastData?.weight} unit="kg" />
-      <Kpi icon={<Battery/>} label="Batterie" value={lastData?.battery} unit="%" colorClass="group-hover:text-emerald-500" />
-      <div className="hidden lg:block border-l border-white/5 h-full mx-auto" /> {/* Séparateur visuel optionnel */}
+  // EXTRACTION ABSOLUE ET SANS EXCEPTION DE TOUS TES CAPTEURS SUPABASE
+  const totalWeight = Number(lastData?.weight || 0);
+  const battery     = lastData?.battery ?? 0;
+  const tempInt     = lastData?.temp_int ?? 0;
+  const tempExt     = lastData?.temp_ext ?? 0;
+  const humInt      = lastData?.hum_int ?? 0;
+  const humExt      = lastData?.hum_ext ?? 0; 
+  const weightP1    = Number(lastData?.weight_p1 || 0);
+  const weightP2    = Number(lastData?.weight_p2 || 0);
+  const weightP3    = Number(lastData?.weight_p3 || 0);
+  const weightP4    = Number(lastData?.weight_p4 || 0);
 
-      {/* Ligne 2 : Températures (Arduino Sensors) */}
-      <Kpi icon={<Thermometer/>} label="Temp. Int" value={lastData?.temp_int} unit="°C" colorClass="group-hover:text-orange-500" />
-      <Kpi icon={<Thermometer/>} label="Temp. Ext" value={lastData?.temp_ext} unit="°C" colorClass="group-hover:text-rose-400" />
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
       
-      {/* Ligne 3 : Humidités (Arduino Sensors) */}
-      <Kpi icon={<Droplets/>} label="Humi. Int" value={lastData?.hum_int} unit="%" colorClass="group-hover:text-blue-400" />
-      <Kpi icon={<Droplets/>} label="Humi. Ext" value={lastData?.hum_ext} unit="%" colorClass="group-hover:text-indigo-400" />
+      {/* CARD POIDS REEL GLOBAL */}
+      <div className="bg-black/30 border border-white/5 rounded-3xl p-6 backdrop-blur-xl">
+        <div className="flex items-center gap-3 text-slate-400 mb-4">
+          <Scale size={20} className="text-amber-500" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Poids Global</span>
+        </div>
+        <div className="flex items-baseline gap-1">
+          <span className="text-5xl font-black font-mono tracking-tight text-white">
+            {totalWeight > 0 ? totalWeight.toFixed(3) : "0.000"}
+          </span>
+          <span className="text-xs font-bold text-slate-500 uppercase">kg</span>
+        </div>
+      </div>
+
+      {/* CARD BATTERIE */}
+      <div className="bg-black/30 border border-white/5 rounded-3xl p-6 backdrop-blur-xl">
+        <div className="flex items-center gap-3 text-slate-400 mb-4">
+          <Battery size={20} className="text-emerald-500" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Batterie</span>
+        </div>
+        <div className="flex items-baseline gap-1">
+          <span className="text-5xl font-black font-mono tracking-tight text-white">
+            {battery}
+          </span>
+          <span className="text-xs font-bold text-slate-500 uppercase">%</span>
+        </div>
+      </div>
+
+      {/* CARD TEMPÉRATURES */}
+      <div className="bg-black/30 border border-white/5 rounded-3xl p-6 backdrop-blur-xl">
+        <div className="flex items-center gap-3 text-slate-400 mb-4">
+          <Thermometer size={20} className="text-orange-500" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Températures</span>
+        </div>
+        <div className="space-y-2">
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-400 font-bold uppercase">TEMP. INT</span>
+            <span className="font-mono font-bold text-white">{Number(tempInt).toFixed(1)}°C</span>
+          </div>
+          <div className="flex justify-between text-xs border-t border-white/5 pt-2">
+            <span className="text-slate-500 font-bold uppercase">TEMP. EXT</span>
+            <span className="font-mono font-bold text-slate-400">{Number(tempExt).toFixed(1)}°C</span>
+          </div>
+        </div>
+      </div>
+
+      {/* CARD HUMIDITÉS */}
+      <div className="bg-black/30 border border-white/5 rounded-3xl p-6 backdrop-blur-xl">
+        <div className="flex items-center gap-3 text-slate-400 mb-4">
+          <Droplets size={20} className="text-sky-500" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Humidité</span>
+        </div>
+        <div className="space-y-2">
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-400 font-bold uppercase">HUM. INT</span>
+            <span className="font-mono font-bold text-white">{Number(humInt).toFixed(1)}%</span>
+          </div>
+          <div className="flex justify-between text-xs border-t border-white/5 pt-2">
+            <span className="text-slate-500 font-bold uppercase">HUM. EXT</span>
+            <span className="font-mono font-bold text-slate-400">{Number(humExt).toFixed(1)}%</span>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }

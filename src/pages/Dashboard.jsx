@@ -11,6 +11,7 @@ import logo from '../assets/logo.png';
 
 // IMPORTATION DU MODAL (Ajuste le chemin relatif si ton fichier est placé ailleurs)
 import AddHiveModal from "../components/AddHiveModal";
+import CommunitySpace from '../components/CommunitySpace';
 
 export default function Dashboard() {
   const [hives, setHives] = useState([]);
@@ -150,6 +151,7 @@ export default function Dashboard() {
             Publier
           </button>
         </div>
+        <CommunitySpace />
       </main>
       
       {/* INTÉGRATION DU MODAL ET DE SES ÉTATS */}

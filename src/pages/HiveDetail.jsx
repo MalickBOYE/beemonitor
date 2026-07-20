@@ -19,6 +19,9 @@ import WeatherWidget from '../components/WeatherWidget';
 import HiveStats from '../components/HiveStats';
 import { getBeeCount } from '../services/beeCount';
 
+// IMPORT DE LA SECTION 2D DU CENTRE DE MASSE
+import Hive2D from "../components/Hive2D";
+
 export default function HiveDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -31,8 +34,6 @@ export default function HiveDetail() {
   const [showSettings, setShowSettings] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [now, setNow] = useState(new Date());
-  
-  // NOUVEAU STATE : Gestion de la période d'affichage (24h par défaut)
   const [timeframe, setTimeframe] = useState('24h');
 
   const last = data.length > 0 ? data[data.length - 1] : null;
@@ -53,14 +54,12 @@ export default function HiveDetail() {
     }
   }, []);
 
-  // MISE À JOUR DE LA REQUÊTE : Filtrage dynamique par date selon la période choisie
   const loadInitialData = useCallback(async () => {
     setLoading(true);
     try {
       const { data: hive } = await supabase.from('hives').select('*').eq('id', id).single();
       setHiveInfo(hive);
 
-      // Calcul de la date limite en fonction du choix utilisateur
       let query = supabase.from('measurements').select('*').eq('hive_id', id);
       const cutoffDate = new Date();
 
@@ -75,7 +74,6 @@ export default function HiveDetail() {
         query = query.gte('created_at', cutoffDate.toISOString());
       }
 
-      // Tri chronologique ascendant pour le graphique
       const { data: m } = await query.order('created_at', { ascending: true });
       
       setData(m || []);
@@ -85,7 +83,7 @@ export default function HiveDetail() {
     } finally {
       setLoading(false);
     }
-  }, [id, timeframe]); // timeframe ajouté en dépendance pour redéclencher le fetch au clic
+  }, [id, timeframe]);
 
   useEffect(() => {
     loadInitialData();
@@ -244,9 +242,13 @@ export default function HiveDetail() {
             </div>
           </div>
 
+          {/* Grille des statistiques physiques */}
           <HiveStats lastData={last} />
 
-          {/* SECTION GRAPHIQUE METAMORPHOSÉE AVEC LE SÉLECTEUR DE TIME-FRAME */}
+          {/* INSERTION COMPLEXE DE LA SECTION 2D DU CENTRE DE MASSE */}
+          <Hive2D data={data} />
+
+          {/* Section d'affichage des flux de données graphiques */}
           <div className="bg-black/30 rounded-[2.5rem] p-10 border border-white/5 h-[500px] mt-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 ml-4 gap-4">
               <div className="flex items-center gap-3">
@@ -254,7 +256,6 @@ export default function HiveDetail() {
                 <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Flux de données</h3>
               </div>
               
-              {/* COMPOSANT DE COMMUTATION INTERFACE */}
               <div className="flex bg-black/40 p-1 rounded-xl border border-white/10 backdrop-blur-xl self-start sm:self-auto">
                 <button 
                   onClick={() => setTimeframe('24h')} 

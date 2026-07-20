@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualisation 3D Ruche connectée</title>
+    <!-- Tailwind CSS pour un design pro -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js et OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-6xl h-[650px] bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl flex flex-col md:flex-row">
+        
+        <!-- Panneau de contrôle gauche -->
+        <div class="w-full md:w-1/3 p-6 bg-slate-950 flex flex-col justify-between border-r border-slate-800 overflow-y-auto">
+            <div>
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="text-amber-500 text-2xl">🧭</span>
+                    <h2 class="text-xl font-bold">Répartition & Reine 3D</h2>
+                </div>
+                <p class="text-xs text-slate-400 mb-6">
+                    Orientation : <span class="text-amber-400 font-semibold">Sud-Ouest (225°)</span>.<br>
+                    La station météo est installée derrière (Nord-Est).
+                </p>
+
+                <!-- Sliders -->
+                <div class="space-y-4">
+                    <h3 class="text-sm font-semibold text-slate-300 border-b border-slate-800 pb-2">Capteurs de pesée (en kg)</h3>
+                    
+                    <!-- P1 -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-emerald-400 font-medium">Avant-Gauche (GPIO 18 / P1)</span>
+                            <span id="p1_val" class="font-bold">15.0 kg</span>
+                        </div>
+                        <input id="slider_p1" type="range" min="0" max="30" step="0.1" value="15.0" class="w-full accent-emerald-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                    </div>
+
+                    <!-- P3 -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-emerald-400 font-medium">Avant-Droit (GPIO 13 / P3)</span>
+                            <span id="p3_val" class="font-bold">15.0 kg</span>
+                        </div>
+                        <input id="slider_p3" type="range" min="0" max="30" step="0.1" value="15.0" class="w-full accent-emerald-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                    </div>
+
+                    <!-- P2 -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-amber-500 font-medium">Arrière-Gauche (GPIO 19 / P2)</span>
+                            <span id="p2_val" class="font-bold">15.0 kg</span>
+                        </div>
+                        <input id="slider_p2" type="range" min="0" max="30" step="0.1" value="15.0" class="w-full accent-amber-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                    </div>
+
+                    <!-- P4 -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-amber-500 font-medium">Arrière-Droit (GPIO 12 / P4)</span>
+                            <span id="p4_val" class="font-bold">15.0 kg</span>
+                        </div>
+                        <input id="slider_p4" type="range" min="0" max="30" step="0.1" value="15.0" class="w-full accent-amber-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total et Barycentre -->
+            <div class="mt-6 pt-4 border-t border-slate-800 space-y-3">
+                <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-800/80">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs text-slate-400">Poids Total</span>
+                        <span id="total_val" class="text-lg font-black text-amber-400">60.00 kg</span>
+                    </div>
+                    <div class="flex justify-between text-[11px] text-slate-400">
+                        <span>Barycentre (X, Z) :</span>
+                        <span id="bary_val" class="font-mono text-amber-500/90">[0.0 cm, 0.0 cm]</span>
+                    </div>
+                </div>
+                <div class="text-[10px] text-slate-400 bg-slate-900 p-2.5 rounded border border-slate-800">
+                    💡 La sphère rouge brillante à l'intérieur de la ruche simule le barycentre physique de la colonie.
+                </div>
+            </div>
+        </div>
+
+        <!-- Zone de Rendu 3D Canvas -->
+        <div class="w-full md:w-2/3 h-full relative" id="canvas-container">
+            <!-- Canvas généré dynamiquement en JS -->
+        </div>
+
+    </div>
+
+    <script>
+        // --- CONFIGURATION GÉOMÉTRIQUE DE LA RUCHE (échelle augmentée pour affichage : x10) ---
+        const H_W = 4.30;
+        const H_L = 5.35;
+        const H_H = 5.00;
+
+        // Variables de pesée initiales
+        let weights = { p1: 15.0, p2: 15.0, p3: 15.0, p4: 15.0 };
+
+        // Initialisation de Three.js
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f172a); // Gris foncé ardoise
+
+        // Caméra
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+        camera.position.set(0, 40, 60);
+
+        // Render
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        // Controls
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.maxPolarAngle = Math.PI / 2 - 0.05;
+        controls.minDistance = 30;
+        controls.maxDistance = 80;
+
+        // Lumières
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        dirLight.position.set(20, 40, 20);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // Sol en herbe
+        const groundGeo = new THREE.PlaneGeometry(100, 100);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x1b2a1c, roughness: 0.9 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -0.5;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // --- DESSIN DU COMPAS (BOUSSOLE) ---
+        const compassRingGeo = new THREE.RingGeometry(20, 20.5, 64);
+        const compassRingMat = new THREE.MeshBasicMaterial({ color: 0x334155, side: THREE.DoubleSide });
+        const compassRing = new THREE.Mesh(compassRingGeo, compassRingMat);
+        compassRing.rotation.x = -Math.PI / 2;
+        compassRing.position.y = -0.4;
+        scene.add(compassRing);
+
+        // Flèche d'orientation de la ruche (SUD-OUEST) à 225°
+        const arrowGeo = new THREE.ConeGeometry(0.8, 2.5, 4);
+        const arrowMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+        const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+        arrow.rotation.x = -Math.PI / 2;
+        // Placer sur l'anneau au Sud-Ouest
+        const angleSW = 5 * Math.PI / 4; 
+        arrow.position.set(18 * Math.cos(angleSW), -0.3, -18 * Math.sin(angleSW));
+        arrow.rotation.z = angleSW + Math.PI/2;
+        scene.add(arrow);
+
+        // --- CONSTRUIRE LA RUCHE ---
+        const hiveGroup = new THREE.Group();
+        // Rotation pour qu'elle face au SUD-OUEST
+        hiveGroup.rotation.y = Math.PI / 4; 
+        scene.add(hiveGroup);
+
+        // Châssis / Base
+        const baseGeo = new THREE.BoxGeometry(H_W + 0.4, 1.0, H_L + 0.4);
+        const baseMat = new THREE.MeshStandardMaterial({ color: 0x854d0e, roughness: 0.8 });
+        const base = new THREE.Mesh(baseGeo, baseMat);
+        base.position.y = 0.5;
+        base.castShadow = true;
+        hiveGroup.add(base);
+
+        // Planche d'envol
+        const flightGeo = new THREE.BoxGeometry(H_W - 0.6, 0.15, 1.2);
+        const flightMat = new THREE.MeshStandardMaterial({ color: 0xa16207 });
+        const flight = new THREE.Mesh(flightGeo, flightMat);
+        flight.position.set(0, 0.1, H_L / 2 + 0.4);
+        flight.rotation.x = 0.2;
+        flight.castShadow = true;
+        hiveGroup.add(flight);
+
+        // Corps de ruche Dadant
+        const bodyGeo = new THREE.BoxGeometry(H_W, H_H, H_L);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.9 });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        body.position.y = H_H / 2 + 1.0;
+        body.castShadow = true;
+        hiveGroup.add(body);
+
+        // Toit double pente galvanisé
+        const roofGroup = new THREE.Group();
+        roofGroup.position.y = H_H + 1.0;
+        const slopeGeo = new THREE.BoxGeometry(H_W / 2 + 0.4, 0.2, H_L + 0.5);
+        const roofMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.7, roughness: 0.3 });
+        
+        const slopeLeft = new THREE.Mesh(slopeGeo, roofMat);
+        slopeLeft.position.set(-H_W / 4 - 0.1, 0.6, 0);
+        slopeLeft.rotation.z = 0.3;
+        slopeLeft.castShadow = true;
+        roofGroup.add(slopeLeft);
+
+        const slopeRight = new THREE.Mesh(slopeGeo, roofMat);
+        slopeRight.position.set(H_W / 4 + 0.1, 0.6, 0);
+        slopeRight.rotation.z = -0.3;
+        slopeRight.castShadow = true;
+        roofGroup.add(slopeRight);
+        hiveGroup.add(roofGroup);
+
+        // --- STATION MÉTÉO (Installée derrière la ruche) ---
+        const meteoGroup = new THREE.Group();
+        meteoGroup.position.set(0, 1.0, -H_L / 2 - 2.5); // Derrière
+        
+        const postGeo = new THREE.CylinderGeometry(0.12, 0.12, 4.0);
+        const postMat = new THREE.MeshStandardMaterial({ color: 0x475569 });
+        const post = new THREE.Mesh(postGeo, postMat);
+        post.position.y = 2.0;
+        meteoGroup.add(post);
+
+        const metBodyGeo = new THREE.BoxGeometry(0.8, 0.6, 0.8);
+        const metBodyMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.4 });
+        const metBody = new THREE.Mesh(metBodyGeo, metBodyMat);
+        metBody.position.y = 4.2;
+        meteoGroup.add(metBody);
+        hiveGroup.add(meteoGroup);
+
+        // --- LE BARYCENTRE (LA REINE / LE COUVAIN) ---
+        const queenGeo = new THREE.SphereGeometry(0.35, 32, 32);
+        const queenMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+        const queenSphere = new THREE.Mesh(queenGeo, queenMat);
+        queenSphere.position.y = H_H / 2 + 1.0;
+        hiveGroup.add(queenSphere);
+
+        // --- FLÈCHES DE CHARGES SUR LES PIEDS ---
+        const footGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.5, 16);
+        const footMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8 });
+
+        const createFoot = (x, z) => {
+            const f = new THREE.Mesh(footGeo, footMat);
+            f.position.set(x, -0.25, z);
+            hiveGroup.add(f);
+
+            // Flèche dynamique
+            const arrowLength = 5;
+            const capGeo = new THREE.CylinderGeometry(0.08, 0.08, arrowLength, 8);
+            const capMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.8 });
+            const cylinder = new THREE.Mesh(capGeo, capMat);
+            cylinder.position.set(x, -0.5 - (arrowLength / 2), z);
+            hiveGroup.add(cylinder);
+
+            // Pointe de flèche
+            const headGeo = new THREE.ConeGeometry(0.25, 0.6, 8);
+            const head = new THREE.Mesh(headGeo, capMat);
+            head.position.set(x, -0.5, z);
+            hiveGroup.add(head);
+
+            return { cylinder, head, mat: capMat };
+        };
+
+        const feet = {
+            p1: createFoot(-H_W / 2, H_L / 2),  // AVG (GPIO 18 / P1)
+            p2: createFoot(-H_W / 2, -H_L / 2), // ARG (GPIO 19 / P2)
+            p3: createFoot(H_W / 2, H_L / 2),   // AVD (GPIO 13 / P3)
+            p4: createFoot(H_W / 2, -H_L / 2)  // ARD (GPIO 12 / P4)
+        };
+
+        // --- LOGIQUE DE CALCUL ET MISES À JOUR ---
+        function update3D() {
+            const total = weights.p1 + weights.p2 + weights.p3 + weights.p4;
+            document.getElementById('total_val').innerText = `${total.toFixed(2)} kg`;
+
+            if (total === 0) return;
+
+            // Calcul du centre de gravité
+            const rightWeight = weights.p3 + weights.p4;
+            const xG = H_W * (rightWeight / total - 0.5);
+
+            const frontWeight = weights.p1 + weights.p3;
+            const zG = H_L * (frontWeight / total - 0.5);
+
+            // Mise à jour de la position de la Reine
+            queenSphere.position.x = xG;
+            queenSphere.position.z = zG;
+
+            document.getElementById('bary_val').innerText = `[${(xG * 10).toFixed(1)} cm, ${(zG * 10).toFixed(1)} cm]`;
+
+            // Mise à jour des flèches
+            const maxVal = Math.max(1, weights.p1, weights.p2, weights.p3, weights.p4);
+            
+            const updateArrow = (foot, weight, isFront) => {
+                const ratio = weight / maxVal;
+                const h = Math.max(0.5, ratio * 6); // Hauteur dynamique
+                
+                foot.cylinder.scale.y = h / 5;
+                foot.cylinder.position.y = -0.5 - (h / 2);
+                
+                // Coloration dynamique (vert pour l'avant, orange/rouge pour l'arrière)
+                const baseColor = isFront ? 0x10b981 : 0xf59e0b;
+                foot.mat.color.setHex(baseColor);
+            };
+
+            updateArrow(feet.p1, weights.p1, true);
+            updateArrow(feet.p3, weights.p3, true);
+            updateArrow(feet.p2, weights.p2, false);
+            updateArrow(feet.p4, weights.p4, false);
+        }
+
+        // --- GESTIONNAIRES D'ÉVÉNEMENTS ---
+        const bindSlider = (id, key, labelId) => {
+            const slider = document.getElementById(id);
+            slider.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                weights[key] = val;
+                document.getElementById(labelId).innerText = `${val.toFixed(1)} kg`;
+                update3D();
+            });
+        };
+
+        bindSlider('slider_p1', 'p1', 'p1_val');
+        bindSlider('slider_p2', 'p2', 'p2_val');
+        bindSlider('slider_p3', 'p3', 'p3_val');
+        bindSlider('slider_p4', 'p4', 'p4_val');
+
+        // Initialisation de l'état
+        update3D();
+
+        // Boucle d'animation
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Ajustement à la taille de la fenêtre
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+    </script>
+</body>
+</html>
