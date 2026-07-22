@@ -1,5 +1,5 @@
 import React from 'react';
-import { Crosshair, ArrowRight, ArrowUp, Bug, Flame } from 'lucide-react';
+import { Crosshair, ArrowRight, ArrowUp, Flame } from 'lucide-react';
 
 export default function Hive2D({ data = [] }) {
   // Dimensions physiques de la plaque de référence (en mm)
@@ -18,6 +18,7 @@ export default function Hive2D({ data = [] }) {
       let y_mm = L / 2;
 
       if (total > 0) {
+        // Calculs physiques basés sur la géométrie du châssis
         x_mm = (1 / total) * ((w1 + w2) * 342.59 + (w3 + w4) * 88.37);
         y_mm = (1 / total) * ((w1 + w3) * 62.48 + (w2 + w4) * 472.29);
       }
@@ -25,13 +26,13 @@ export default function Hive2D({ data = [] }) {
       const dateObj = new Date(m.created_at);
       const hours = dateObj.getHours();
 
-      let colorClass = "bg-sky-400 shadow-sky-500/50";
+      let colorClass = "bg-sky-400 shadow-sky-500/50"; // Matin (Bleu)
       if (hours >= 11 && hours < 16) {
-        colorClass = "bg-emerald-400 shadow-emerald-500/50";
+        colorClass = "bg-emerald-400 shadow-emerald-500/50"; // Midi (Vert)
       } else if (hours >= 16 && hours < 20) {
-        colorClass = "bg-amber-400 shadow-amber-500/50";
+        colorClass = "bg-amber-400 shadow-amber-500/50"; // Soir (Jaune)
       } else if (hours >= 20 || hours < 6) {
-        colorClass = "bg-rose-500 shadow-rose-500/50";
+        colorClass = "bg-slate-400 shadow-slate-500/50"; // Nuit (Gris/Autre)
       }
 
       return {
@@ -42,13 +43,14 @@ export default function Hive2D({ data = [] }) {
         total,
         colorClass,
         time: dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-        hour: hours
+        hour: hours,
+        created_at: m.created_at
       };
     });
   };
 
   const points = calculatePointsForData(data);
-  const latestPoint = points[points.length - 1] || { x: 50, y: 50, x_mm: 0, y_mm: 0, total: 0 };
+  const latestPoint = points[points.length - 1] || { x: 50, y: 50, x_mm: 0, y_mm: 0, total: 0, colorClass: "bg-sky-400" };
 
   return (
     <div className="flex flex-col gap-8 mt-8">
@@ -112,53 +114,75 @@ export default function Hive2D({ data = [] }) {
           </div>
         </div>
 
-        {/* PANNEAU LATÉRAL (CENTRE DE MASSE) */}
-        <div className="flex flex-col gap-4">
-          <div className="bg-amber-950/20 p-5 rounded-2xl border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.02)]">
-            <div className="flex items-center gap-2 mb-4">
-              <Bug size={14} className="text-amber-500" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">
+        {/* PANNEAU LATÉRAL (CENTRE DE MASSE) AVEC CONTEXTE DIDACTIQUE */}
+        <div className="flex flex-col gap-6">
+          
+          {/* Indicateur du point le plus récent */}
+          <div className="bg-slate-950/20 p-6 rounded-2xl border border-white/5">
+            <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 block mb-3">
+              État de la colonie
+            </span>
+            <div className="flex items-center gap-4">
+                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${latestPoint.colorClass} shadow-inner`}>
+                     <Crosshair size={32} className="text-white/30" />
+                </div>
+                <div>
+                    <div className="text-2xl font-black text-amber-400 font-mono">
+                        {latestPoint.time}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-1">
+                        Dernier relevé
+                    </div>
+                </div>
+            </div>
+          </div>
+
+          {/* Coordonnées et Explications du Centre de Masse */}
+          <div className="bg-amber-950/20 p-6 rounded-2xl border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.02)]">
+            <div className="flex items-center gap-3 mb-5">
+              <h3 className="text-[12px] font-black uppercase tracking-wider text-amber-500">
                 Coordonnées du Centre de Masse
-              </span>
+              </h3>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
-              <div className="bg-black/50 p-3 rounded border border-white/5 flex flex-col gap-1">
-                <span className="text-slate-500 text-[8px] uppercase font-bold">Axe X</span>
-                <span className="text-amber-500 text-sm font-bold">{latestPoint.x_mm.toFixed(2)} mm</span>
+            <div className="grid grid-cols-2 gap-4 text-sm font-mono mb-6">
+              <div className="bg-black/50 p-4 rounded-xl border border-white/5 flex flex-col gap-1.5">
+                <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wide">Axe X</span>
+                <span className="text-amber-400 text-xl font-black">{latestPoint.x_mm.toFixed(0)}<span className="text-sm ml-1 opacity-70">mm</span></span>
               </div>
-              <div className="bg-black/50 p-3 rounded border border-white/5 flex flex-col gap-1">
-                <span className="text-slate-500 text-[8px] uppercase font-bold">Axe Y</span>
-                <span className="text-amber-500 text-sm font-bold">{latestPoint.y_mm.toFixed(2)} mm</span>
+              <div className="bg-black/50 p-4 rounded-xl border border-white/5 flex flex-col gap-1.5">
+                <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wide">Axe Y</span>
+                <span className="text-amber-400 text-xl font-black">{latestPoint.y_mm.toFixed(0)}<span className="text-sm ml-1 opacity-70">mm</span></span>
               </div>
+            </div>
+
+            <div className="bg-amber-900/30 p-5 rounded-xl border border-amber-500/30 text-xs text-amber-200 leading-relaxed">
+              <strong className="text-amber-100 block mb-1.5">Qu'est-ce que c'est ?</strong>
+              Le centre de masse représente la position géographique moyenne de la colonie dans la ruche à un instant T. Sur cette représentation, on a le chassis sur lequel est posé la ruche et qui contient des capteurs de poids. Chaque capteur de poids est à une force (poids). La connaissance de ces valeurs permet d'estimer à quel endroit du chassis on a plus d'effort et de déduire des informations.
+            </div>
+            <div className="bg-black/30 p-5 rounded-xl border border-white/5 text-xs text-slate-400 leading-relaxed mt-4">
+              <strong className="text-slate-200 block mb-1.5">À quoi ça sert ?</strong>
+              Suivre son évolution permet de visualiser les migrations du couvain ou la disposition des réserves de miel. Un déplacement soudain peut indiquer un essaimage imminent.
             </div>
           </div>
           
-          <div className="bg-black/20 p-5 rounded-2xl border border-white/5 text-[10px] text-slate-400 leading-relaxed font-medium">
-            <div className="text-slate-500 font-black uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 bg-sky-400 rounded-full"></span> Matin | 
-              <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> Midi | 
-              <span className="w-1.5 h-1.5 bg-amber-400 rounded-full"></span> Soir
-            </div>
-            Le code couleur indique la progression horaire de la colonie à travers les différents compartiments de la ruche.
-          </div>
         </div>
 
       </div>
 
-      {/* 📊 HEATMAP AVEC LÉGENDE RÉADAPTÉE ET BORDURES DE PLANCHE ALIGNÉES */}
-      <div className="bg-black/30 rounded-[2.5rem] p-8 border border-white/5">
-        <div className="flex items-center gap-2 mb-6 ml-2">
-          <Flame size={16} className="text-amber-500" />
-          <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
-            Modèle de Densité de Présence (Vue Thermographique)
+      {/* 📊 HEATMAP AVEC LÉGENDE HARMONISÉE ET TITRE CORRIGÉ */}
+      <div className="bg-black/30 rounded-[2.5rem] p-10 border border-white/5">
+        <div className="flex items-center gap-3 mb-10 ml-2">
+          <Flame size={20} className="text-amber-500" />
+          <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400">
+            Modèle de Densité de Présence
           </h4>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 items-center">
           
-          <div className="md:col-span-2 bg-slate-950/80 p-6 rounded-2xl border border-white/5 flex justify-center items-center relative overflow-hidden aspect-[1.4/1]">
-            <div className="relative w-full max-w-[380px] aspect-[1/1.2] flex items-center justify-center">
+          <div className="md:col-span-2 bg-slate-950/80 p-6 rounded-3xl border border-white/5 flex justify-center items-center relative overflow-hidden aspect-[1.4/1]">
+            <div className="relative w-full max-w-[400px] aspect-[1/1.2] flex items-center justify-center">
               
               <img 
                 src="/images/Chassis.png" 
@@ -172,13 +196,13 @@ export default function Hive2D({ data = [] }) {
                   return (
                     <div 
                       key={`pitch-heat-${index}`}
-                      className="absolute rounded-full transform -translate-x-1/2 translate-y-1/2 mix-blend-screen filter blur-xl"
+                      className="absolute rounded-full transform -translate-x-1/2 translate-y-1/2 mix-blend-screen filter blur-2xl"
                       style={{
                         left: `${pt.x}%`,
                         bottom: `${pt.y}%`,
-                        width: `${70 + factor * 40}px`,
-                        height: `${70 + factor * 40}px`,
-                        background: `radial-gradient(circle, rgba(239,68,68,${0.4 * factor}) 0%, rgba(245,158,11,${0.3 * factor}) 45%, rgba(52,211,153,${0.15 * factor}) 75%, transparent 100%)`
+                        width: `${80 + factor * 50}px`,
+                        height: `${80 + factor * 50}px`,
+                        background: `radial-gradient(circle, rgba(225,29,72,${0.6 * factor}) 0%, rgba(251,191,36,${0.5 * factor}) 35%, rgba(52,211,153,${0.3 * factor}) 65%, rgba(14,165,233,${0.2 * factor}) 85%, transparent 100%)`
                       }}
                     />
                   );
@@ -187,18 +211,21 @@ export default function Hive2D({ data = [] }) {
             </div>
           </div>
 
-          <div className="bg-black/40 p-6 rounded-2xl border border-white/5 h-full flex flex-col justify-center">
-            <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 block mb-3">Échelle d'Intensité de Présence</span>
+          <div className="bg-black/40 p-8 rounded-3xl border border-white/5 h-full flex flex-col justify-center">
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 block mb-4">Échelle d'Intensité de Présence</span>
             
-            <div className="w-full h-3 rounded-full bg-gradient-to-r from-blue-500 via-emerald-400 via-amber-400 to-rose-600 mb-4 shadow-inner"></div>
+            <div 
+              className="w-full h-4 rounded-full mb-5 shadow-inner"
+              style={{ background: 'linear-gradient(to right, #0ea5e9, #34d399, #fbbf24, #e11d48)' }}
+            ></div>
             
-            <div className="flex justify-between text-[8px] font-mono uppercase text-slate-400 font-bold mb-4">
+            <div className="flex justify-between text-[10px] font-mono uppercase text-slate-400 font-bold mb-5">
               <span>Faible</span>
               <span>Moyenne</span>
               <span>Forte concentration</span>
             </div>
 
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <p className="text-sm text-slate-400 leading-relaxed">
               Plus la brillance et l'intensité lumineuse (en <strong>rouge vif</strong>) sont élevées sur une zone, plus cela révèle une forte concentration et une présence accrue des abeilles à cet endroit précis du châssis.
             </p>
           </div>
