@@ -25,7 +25,7 @@ export default function HiveStats({ lastData }) {
         </div>
         <div className="flex items-baseline gap-1">
           <span className="text-5xl font-black font-mono tracking-tight text-white">
-            {totalWeight > 0 ? totalWeight.toFixed(3) : "0.000"}
+            {totalWeight > 0 ? totalWeight.toFixed(1) : "0.0"}
           </span>
           <span className="text-xs font-bold text-slate-500 uppercase">kg</span>
         </div>
@@ -35,7 +35,7 @@ export default function HiveStats({ lastData }) {
       <div className="bg-black/30 border border-white/5 rounded-3xl p-6 backdrop-blur-xl">
         <div className="flex items-center gap-3 text-slate-400 mb-4">
           <Battery size={20} className="text-emerald-500" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Batterie</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Batterie Airbox</span>
         </div>
         <div className="flex items-baseline gap-1">
           <span className="text-5xl font-black font-mono tracking-tight text-white">

@@ -158,7 +158,7 @@ export default function Hive2D({ data = [] }) {
 
             <div className="bg-amber-900/30 p-5 rounded-xl border border-amber-500/30 text-xs text-amber-200 leading-relaxed">
               <strong className="text-amber-100 block mb-1.5">Qu'est-ce que c'est ?</strong>
-              Le centre de masse représente la position géographique moyenne de la colonie dans la ruche à un instant T. Sur cette représentation, on a le chassis sur lequel est posé la ruche et qui contient des capteurs de poids. Chaque capteur de poids est à une force (poids). La connaissance de ces valeurs permet d'estimer à quel endroit du chassis on a plus d'effort et de déduire des informations.
+              Le centre de masse correspond au point d'application de la charge totale (colonie, cadres, miel et structure) sur le plan horizontal du châssis.Ce système repose sur un réseau de capteurs de poids (cellules de charge) disposés sous la structure. En analysant en temps réel la répartition des efforts exercés sur chaque capteur, le programme calcule les coordonnées $(X, Y)$ du centre de gravité. Ce suivi permet d'observer la dynamique interne de la colonie, comme le déplacement de la grappe d'abeilles ou l'évolution de la répartition des réserves.
             </div>
             <div className="bg-black/30 p-5 rounded-xl border border-white/5 text-xs text-slate-400 leading-relaxed mt-4">
               <strong className="text-slate-200 block mb-1.5">À quoi ça sert ?</strong>

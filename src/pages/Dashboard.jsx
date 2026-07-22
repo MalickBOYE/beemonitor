@@ -9,7 +9,7 @@ import BackgroundSlider from '../components/BackgroundSlider';
 import Footer from '../components/Footer';
 import logo from '../assets/logo.png';
 
-// IMPORTATION DU MODAL (Ajuste le chemin relatif si ton fichier est placé ailleurs)
+// IMPORTATION DU MODAL
 import AddHiveModal from "../components/AddHiveModal";
 import CommunitySpace from '../components/CommunitySpace';
 
@@ -17,7 +17,7 @@ export default function Dashboard() {
   const [hives, setHives] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false); // État de visibilité du modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -84,8 +84,8 @@ export default function Dashboard() {
         >
           <img src={logo} alt="Logo" className="h-10 w-auto" />
           <div className="flex flex-col">
-            <h1 className="text-lg font-black uppercase tracking-tighter leading-none">Beemonitor</h1>
-            <span className="text-[8px] text-amber-500 font-bold uppercase tracking-[0.3em]">Live Intelligence</span>
+            <h1 className="text-lg font-black uppercase tracking-tighter leading-none">La ruche connectée</h1>
+            <span className="text-[8px] text-amber-500 font-bold uppercase tracking-[0.3em]">une solution pour le bien etre des abeilles</span>
           </div>
         </div>
         <button 
@@ -111,7 +111,7 @@ export default function Dashboard() {
           
           {isAdmin && (
             <button 
-              onClick={() => setIsModalOpen(true)} // Modification ici : ouvre le modal local au lieu de naviguer
+              onClick={() => setIsModalOpen(true)}
               className="bg-amber-500 hover:bg-white text-black font-black py-3 px-6 rounded-2xl transition-all uppercase text-[10px] tracking-widest flex items-center gap-2"
             >
               <Plus size={16} /> Ajouter une ruche
@@ -126,12 +126,16 @@ export default function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {hives.map((hive) => (
-              <HiveCard 
-                key={hive.id}
-                hive={hive} 
-                onNavigate={() => navigate(`/hive/${hive.id}`)} 
-                onDelete={() => {}} 
-              />
+              <div key={hive.id} className="flex flex-col gap-3">
+                <HiveCard 
+                  hive={hive} 
+                  onNavigate={() => navigate(`/hive/${hive.id}`)} 
+                  onDelete={() => {}} 
+                />
+                <span className="text-[10px] text-slate-500 text-center uppercase tracking-wider font-medium">
+                  Appuyez sur la carte pour voir l'analyse détaillée
+                </span>
+              </div>
             ))}
           </div>
         )}
@@ -154,7 +158,6 @@ export default function Dashboard() {
         <CommunitySpace />
       </main>
       
-      {/* INTÉGRATION DU MODAL ET DE SES ÉTATS */}
       <AddHiveModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 

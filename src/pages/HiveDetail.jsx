@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import { 
   ArrowLeft, Bluetooth, Wifi, MapPin, Activity, Settings, 
-  Trash2, Download, CheckCircle, Moon, WifiOff, Eye 
+  Trash2, Download, CheckCircle, Moon, WifiOff 
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -17,7 +17,6 @@ import HiveSettingsModal from '../components/HiveSettingsModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import WeatherWidget from '../components/WeatherWidget';
 import HiveStats from '../components/HiveStats';
-import { getBeeCount } from '../services/beeCount';
 
 // IMPORT DE LA SECTION 2D DU CENTRE DE MASSE
 import Hive2D from "../components/Hive2D";
@@ -29,7 +28,6 @@ export default function HiveDetail() {
   const [data, setData] = useState([]);
   const [hiveInfo, setHiveInfo] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [beeCount, setBeeCount] = useState(0);
   const [isBleConnected, setIsBleConnected] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
@@ -41,17 +39,6 @@ export default function HiveDetail() {
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(timer);
-  }, []);
-
-  const analyzeBees = useCallback(async (imageUrl, measurementId) => {
-    if (!imageUrl) return;
-    try {
-      const count = await getBeeCount(imageUrl);
-      setBeeCount(count);
-      await supabase.from('measurements').update({ bee_count: count }).eq('id', measurementId);
-    } catch (err) {
-      console.error("IA Error:", err);
-    }
   }, []);
 
   const loadInitialData = useCallback(async () => {
@@ -77,7 +64,6 @@ export default function HiveDetail() {
       const { data: m } = await query.order('created_at', { ascending: true });
       
       setData(m || []);
-      if (m?.[m.length - 1]?.bee_count) setBeeCount(m[m.length - 1].bee_count);
     } catch (error) {
       toast.error("Erreur de liaison");
     } finally {
@@ -91,11 +77,10 @@ export default function HiveDetail() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'measurements', filter: `hive_id=eq.${id}` }, 
       (payload) => {
         setData(prev => [...prev, payload.new].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)));
-        if (payload.new.image_url) analyzeBees(payload.new.image_url, payload.new.id);
         toast.success("Synchronisation Cloud");
       }).subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [id, loadInitialData, analyzeBees]);
+  }, [id, loadInitialData]);
 
   useEffect(() => {
     const checkSystemHealth = async () => {
@@ -140,12 +125,29 @@ export default function HiveDetail() {
     return () => clearInterval(healthInterval);
   }, [id, hiveInfo, data]);
 
+  const handleUpdateDeepSleep = async (minutes) => {
+    try {
+      const { error } = await supabase
+        .from('hives')
+        .update({ deepsleep_minutes: minutes })
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      setHiveInfo(prev => ({ ...prev, deepsleep_minutes: minutes }));
+      toast.success(`Veille réglée à ${minutes} minutes`);
+    } catch (err) {
+      toast.error("Erreur lors de la mise à jour du deepsleep");
+    }
+  };
+
   const exportToCSV = () => {
     if (data.length === 0) return toast.error("Aucune donnée");
-    const headers = "Date,Heure,Poids(kg),Temp_Int(C),Temp_Ext(C),Humi_Int(%),Humi_Ext(%),Abeilles\n";
+    const headers = "Date,Heure,Poids(kg),Temp_Int(C),Temp_Ext(C),Humi_Int(%),Humi_Ext(%)\n";
     const csvContent = data.map(m => {
       const d = new Date(m.created_at);
-      return `${d.toLocaleDateString()},${d.toLocaleTimeString()},${m.weight},${m.temp_int},${m.temp_ext},${m.hum_int},${m.hum_ext},${m.bee_count}`;
+      const formattedWeight = m.weight !== null && m.weight !== undefined ? Number(m.weight).toFixed(1) : '';
+      return `${d.toLocaleDateString()},${d.toLocaleTimeString()},${formattedWeight},${m.temp_int},${m.temp_ext},${m.hum_int},${m.hum_ext}`;
     }).join("\n");
     const blob = new Blob([headers + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -172,7 +174,7 @@ export default function HiveDetail() {
     const hour = now.getHours();
     const isNight = hour >= 21 || hour <= 7;
 
-    if (diff < 45) return { label: "Online", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/50", icon: <CheckCircle size={12}/> };
+    if (diff < 75) return { label: "Online", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/50", icon: <CheckCircle size={12}/> };
     if (isNight) return { label: "Sommeil", color: "text-blue-400 bg-blue-500/10 border-blue-500/50", icon: <Moon size={12}/> };
     return { label: "Offline", color: "text-red-400 bg-red-500/10 border-red-500/50", icon: <WifiOff size={12}/> };
   };
@@ -232,23 +234,47 @@ export default function HiveDetail() {
               </p>
               {hiveInfo && <div className="mt-8"><WeatherWidget lat={hiveInfo.latitude} lng={hiveInfo.longitude} /></div>}
             </div>
+          </div>
 
-            <div className="bg-black/40 border border-amber-500/30 p-8 rounded-[2.5rem] flex items-center gap-8 shadow-xl">
-              <div className="h-16 w-16 bg-amber-500/20 rounded-2xl flex items-center justify-center text-amber-500"><Eye size={32} /></div>
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">IA Vision Analysis</span>
-                <div className="text-4xl font-black text-white">{beeCount} <span className="text-sm text-amber-500">ABEILLES</span></div>
+          {/* Sélecteur de DeepSleep à distance (2min, 15min, 30min, 60min) */}
+          {hiveInfo && (
+            <div className="flex flex-wrap items-center gap-4 bg-black/30 p-4 rounded-2xl border border-white/5 w-fit mb-8">
+              <div className="flex items-center gap-2 px-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
+                <Moon size={14} className="text-amber-500" /> Veille (DeepSleep) :
+              </div>
+              <div className="flex bg-black/40 p-1 rounded-xl border border-white/10 backdrop-blur-xl">
+                <button 
+                  onClick={() => handleUpdateDeepSleep(2)} 
+                  className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${hiveInfo?.deepsleep_minutes === 2 ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                >
+                  2 min
+                </button>
+                <button 
+                  onClick={() => handleUpdateDeepSleep(15)} 
+                  className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${hiveInfo?.deepsleep_minutes === 15 ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                >
+                  15 min
+                </button>
+                <button 
+                  onClick={() => handleUpdateDeepSleep(30)} 
+                  className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${hiveInfo?.deepsleep_minutes === 30 ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                >
+                  30 min
+                </button>
+                <button 
+                  onClick={() => handleUpdateDeepSleep(60)} 
+                  className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${hiveInfo?.deepsleep_minutes === 60 ? 'bg-amber-500 text-black shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                >
+                  60 min
+                </button>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Grille des statistiques physiques */}
           <HiveStats lastData={last} />
 
-          {/* INSERTION COMPLEXE DE LA SECTION 2D DU CENTRE DE MASSE */}
-          <Hive2D data={data} />
-
-          {/* Section d'affichage des flux de données graphiques */}
+          {/* Section d'affichage des flux de données graphiques placée juste après les stats */}
           <div className="bg-black/30 rounded-[2.5rem] p-10 border border-white/5 h-[500px] mt-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 ml-4 gap-4">
               <div className="flex items-center gap-3">
@@ -292,7 +318,14 @@ export default function HiveDetail() {
                   stroke="#475569" fontSize={10} 
                 />
                 <YAxis stroke="#475569" fontSize={10} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{background: '#0f172a', border: 'none', borderRadius: '15px'}} labelFormatter={(l) => new Date(l).toLocaleString('fr-FR')} />
+                <Tooltip 
+                  contentStyle={{background: '#0f172a', border: 'none', borderRadius: '15px'}} 
+                  labelFormatter={(l) => new Date(l).toLocaleString('fr-FR')} 
+                  formatter={(value, name) => [
+                    name === 'Poids' ? `${Number(value).toFixed(1)} kg` : value,
+                    name
+                  ]}
+                />
                 <Legend verticalAlign="top" align="right" />
                 <Line name="Poids" type="monotone" dataKey="weight" stroke="#fbbf24" strokeWidth={4} dot={false} />
                 <Line name="Temp Int" type="monotone" dataKey="temp_int" stroke="#f97316" strokeWidth={2} dot={false} />
@@ -302,6 +335,10 @@ export default function HiveDetail() {
               </LineChart>
             </ResponsiveContainer>
           </div>
+
+          {/* SECTION 2D DU CENTRE DE MASSE */}
+          <Hive2D data={data} />
+
         </div>
       </main>
       <Footer />
