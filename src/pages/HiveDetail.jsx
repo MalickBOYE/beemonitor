@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import { 
   ArrowLeft, Bluetooth, Wifi, MapPin, Activity, Settings, 
-  Trash2, Download, CheckCircle, Moon, WifiOff 
+  Trash2, Download, CheckCircle, Moon, WifiOff, LogOut 
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -28,6 +28,7 @@ export default function HiveDetail() {
   const [data, setData] = useState([]);
   const [hiveInfo, setHiveInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [isBleConnected, setIsBleConnected] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
@@ -44,9 +45,25 @@ export default function HiveDetail() {
   const loadInitialData = useCallback(async () => {
     setLoading(true);
     try {
+      // 1. Vérification du rôle administrateur de l'utilisateur connecté
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile?.is_admin) {
+          setIsAdmin(true);
+        }
+      }
+
+      // 2. Chargement des infos de la ruche
       const { data: hive } = await supabase.from('hives').select('*').eq('id', id).single();
       setHiveInfo(hive);
 
+      // 3. Chargement des mesures selon la période
       let query = supabase.from('measurements').select('*').eq('hive_id', id);
       const cutoffDate = new Date();
 
@@ -62,7 +79,6 @@ export default function HiveDetail() {
       }
 
       const { data: m } = await query.order('created_at', { ascending: true });
-      
       setData(m || []);
     } catch (error) {
       toast.error("Erreur de liaison");
@@ -141,6 +157,17 @@ export default function HiveDetail() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      toast.success("Déconnexion réussie");
+      navigate('/');
+    } catch (err) {
+      toast.error("Erreur lors de la déconnexion");
+    }
+  };
+
   const exportToCSV = () => {
     if (data.length === 0) return toast.error("Aucune donnée");
     const headers = "Date,Heure,Poids(kg),Temp_Int(C),Temp_Ext(C),Humi_Int(%),Humi_Ext(%)\n";
@@ -206,6 +233,7 @@ export default function HiveDetail() {
           <div className="flex gap-2 border-r border-white/10 pr-4">
             <button onClick={() => setShowSettings(true)} className="p-3 bg-white/5 rounded-xl text-slate-400 hover:text-amber-500 transition-all border border-white/5"><Settings size={18}/></button>
             <button onClick={() => setShowDelete(true)} className="p-3 bg-white/5 rounded-xl text-slate-400 hover:text-red-500 transition-all border border-white/5"><Trash2 size={18}/></button>
+            <button onClick={handleLogout} className="p-3 bg-white/5 rounded-xl text-slate-400 hover:text-red-400 transition-all border border-white/5" title="Déconnexion"><LogOut size={18}/></button>
           </div>
 
           <button onClick={exportToCSV} className="hidden lg:flex items-center gap-2 px-5 py-2.5 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black hover:bg-white/10 transition-all text-slate-300 uppercase tracking-widest">
@@ -236,8 +264,8 @@ export default function HiveDetail() {
             </div>
           </div>
 
-          {/* Sélecteur de DeepSleep à distance (2min, 15min, 30min, 60min) */}
-          {hiveInfo && (
+          {/* Sélecteur de DeepSleep visible uniquement pour l'administrateur */}
+          {isAdmin && hiveInfo && (
             <div className="flex flex-wrap items-center gap-4 bg-black/30 p-4 rounded-2xl border border-white/5 w-fit mb-8">
               <div className="flex items-center gap-2 px-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
                 <Moon size={14} className="text-amber-500" /> Veille (DeepSleep) :
