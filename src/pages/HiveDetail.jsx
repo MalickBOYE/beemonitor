@@ -264,7 +264,6 @@ export default function HiveDetail() {
             </div>
           </div>
 
-          {/* Sélecteur de DeepSleep visible uniquement pour l'administrateur */}
           {isAdmin && hiveInfo && (
             <div className="flex flex-wrap items-center gap-4 bg-black/30 p-4 rounded-2xl border border-white/5 w-fit mb-8">
               <div className="flex items-center gap-2 px-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
@@ -299,10 +298,8 @@ export default function HiveDetail() {
             </div>
           )}
 
-          {/* Grille des statistiques physiques */}
           <HiveStats lastData={last} />
 
-          {/* Section d'affichage des flux de données graphiques placée juste après les stats */}
           <div className="bg-black/30 rounded-[2.5rem] p-10 border border-white/5 h-[500px] mt-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 ml-4 gap-4">
               <div className="flex items-center gap-3">
@@ -355,16 +352,53 @@ export default function HiveDetail() {
                   ]}
                 />
                 <Legend verticalAlign="top" align="right" />
-                <Line name="Poids" type="monotone" dataKey="weight" stroke="#fbbf24" strokeWidth={4} dot={false} />
-                <Line name="Temp Int" type="monotone" dataKey="temp_int" stroke="#f97316" strokeWidth={2} dot={false} />
-                <Line name="Temp Ext" type="monotone" dataKey="temp_ext" stroke="#fb7185" strokeWidth={2} strokeDasharray="5 5" dot={false} />
-                <Line name="Humi Int" type="monotone" dataKey="hum_int" stroke="#3b82f6" strokeWidth={2} dot={false} />
-                <Line name="Humi Ext" type="monotone" dataKey="hum_ext" stroke="#818cf8" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                <Line 
+                  name="Poids" 
+                  type="monotone" 
+                  dataKey="weight" 
+                  stroke="#fbbf24" 
+                  strokeWidth={4} 
+                  dot={{ r: 4, fill: '#fbbf24' }} 
+                  activeDot={{ r: 8 }} 
+                />
+                <Line 
+                  name="Temp Int" 
+                  type="monotone" 
+                  dataKey="temp_int" 
+                  stroke="#f97316" 
+                  strokeWidth={2} 
+                  dot={{ r: 3, fill: '#f97316' }} 
+                />
+                <Line 
+                  name="Temp Ext" 
+                  type="monotone" 
+                  dataKey="temp_ext" 
+                  stroke="#fb7185" 
+                  strokeWidth={2} 
+                  strokeDasharray="5 5" 
+                  dot={{ r: 3, fill: '#fb7185' }} 
+                />
+                <Line 
+                  name="Humi Int" 
+                  type="monotone" 
+                  dataKey="hum_int" 
+                  stroke="#3b82f6" 
+                  strokeWidth={2} 
+                  dot={{ r: 3, fill: '#3b82f6' }} 
+                />
+                <Line 
+                  name="Humi Ext" 
+                  type="monotone" 
+                  dataKey="hum_ext" 
+                  stroke="#818cf8" 
+                  strokeWidth={2} 
+                  strokeDasharray="5 5" 
+                  dot={{ r: 3, fill: '#818cf8' }} 
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
 
-          {/* SECTION 2D DU CENTRE DE MASSE */}
           <Hive2D data={data} />
 
         </div>
