@@ -16,15 +16,33 @@ export default function Login() {
     setError(null);
 
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({ 
+      // 1. Authentification de l'utilisateur
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ 
         email, 
         password 
       });
 
       if (authError) throw authError;
       
-      // Connexion réussie -> Vers le dashboard
-      navigate('/dashboard');
+      // 2. Vérification du rôle dans la table "profiles"
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (profileError) {
+        console.error("Erreur lors de la récupération du profil", profileError);
+        navigate('/dashboard'); // Redirection par défaut si erreur de lecture
+        return;
+      }
+
+      // 3. Redirection conditionnelle
+      if (profile.is_admin) {
+        navigate('/admin'); // Redirige vers AdminDashboard
+      } else {
+        navigate('/dashboard'); // Redirige vers le tableau de bord classique
+      }
 
     } catch (err) {
       setError("Email ou mot de passe incorrect.");
@@ -75,7 +93,7 @@ export default function Login() {
               />
             </div>
             
-            {/* LE BOUTON MOT DE PASSE OUBLIÉ EST ICI */}
+            {/* BOUTON MOT DE PASSE OUBLIÉ */}
             <div className="flex justify-end pr-2">
               <button
                 type="button"
