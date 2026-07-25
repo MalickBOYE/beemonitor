@@ -31,10 +31,36 @@ export default function Dashboard() {
     return () => supabase.removeChannel(channel);
   }, []);
 
+  // VÉRIFICATION DU RÔLE DE L'UTILISATEUR (OPTION A)
   async function checkUserRole() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      setIsAdmin(true); 
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('is_admin, role')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error("Erreur lors de la récupération du profil:", error);
+          setIsAdmin(false);
+          return;
+        }
+
+        // Vérifie si la colonne is_admin est true OU si le champ role vaut 'admin'
+        if (profile && (profile.is_admin === true || profile.role === 'admin')) {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
+      } else {
+        setIsAdmin(false);
+      }
+    } catch (err) {
+      console.error("Erreur lors de la vérification des droits:", err);
+      setIsAdmin(false);
     }
   }
 
@@ -109,6 +135,7 @@ export default function Dashboard() {
             </p>
           </div>
           
+          {/* Le bouton d'ajout s'affiche UNIQUEMENT si isAdmin est true */}
           {isAdmin && (
             <button 
               onClick={() => setIsModalOpen(true)}
