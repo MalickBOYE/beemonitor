@@ -29,7 +29,7 @@ export default function Register() {
     setLoading(true);
 
     try {
-      // 2. Inscription avec les métadonnées pour l'automatisme
+      // 2. Inscription avec les métadonnées
       const { data, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -37,8 +37,8 @@ export default function Register() {
           data: {
             first_name: formData.firstName,
             last_name: formData.lastName,
-            phone: formData.phone,
-            is_approved: false 
+            phone: formData.phone
+            // is_approved a été retiré car la validation se fait par email maintenant
           }
         }
       });
@@ -46,7 +46,8 @@ export default function Register() {
       if (authError) throw authError;
 
       if (data.user) {
-        alert("Inscription réussie ! Votre compte est en attente de validation par l'administrateur.");
+        // NOUVEAU MESSAGE D'ALERTE
+        alert("Inscription réussie ! Veuillez vérifier votre boîte mail (et vos spams) pour confirmer votre compte avant de vous connecter.");
         navigate('/login');
       }
     } catch (err) {
