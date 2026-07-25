@@ -38,14 +38,21 @@ export default function Login() {
       }
 
       // 3. Redirection conditionnelle
-      if (profile.is_admin) {
+      if (profile?.is_admin) {
         navigate('/admin'); // Redirige vers AdminDashboard
       } else {
         navigate('/dashboard'); // Redirige vers le tableau de bord classique
       }
 
     } catch (err) {
-      setError("Email ou mot de passe incorrect.");
+      // GESTION SPÉCIFIQUE DES ERREURS
+      if (err.message === "Email not confirmed") {
+        setError("Veuillez confirmer votre adresse email en cliquant sur le lien que nous vous avons envoyé.");
+      } else if (err.message === "Invalid login credentials") {
+        setError("Email ou mot de passe incorrect.");
+      } else {
+        setError("Une erreur est survenue lors de la connexion.");
+      }
     } finally {
       setLoading(false);
     }
