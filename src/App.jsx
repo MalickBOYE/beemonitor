@@ -9,7 +9,7 @@ import ActualiteDetail from './pages/ActualiteDetail';
 
 // 1. IMPORTATION DES DEUX PAGES
 import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
+import ResetPassword from './pages/UpdatePassword';
 
 export default function App() {
   return (
