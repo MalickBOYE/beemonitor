@@ -5,7 +5,11 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import HiveDetail from './pages/HiveDetail';
 import AdminDashboard from './pages/AdminDashboard';
-import ActualiteDetail from './pages/ActualiteDetail'; // Import de la page de détail
+import ActualiteDetail from './pages/ActualiteDetail';
+
+// 1. IMPORTATION DES DEUX PAGES
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 
 export default function App() {
   return (
@@ -15,6 +19,10 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        
+        {/* Routes pour la réinitialisation du mot de passe */}
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         
         {/* Route Admin */}
         <Route path="/admin" element={<AdminDashboard />} />
